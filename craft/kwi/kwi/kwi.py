@@ -7,7 +7,7 @@ from Package.CMakePackageBase import CMakePackageBase
 
 class subinfo(info.infoclass):
     def setTargets(self):
-        self.description = "Kwi standalone terminal, pinned macOS bring-up"
+        self.description = "Kwi terminal for Apple Silicon macOS"
         revision = "aadf139a6a40550b956e30ad501cc0064a597b77"
         self.svnTargets["0.1.0"] = f"https://invent.kde.org/utilities/kwi.git|master|{revision}"
         self.defaultTarget = "0.1.0"

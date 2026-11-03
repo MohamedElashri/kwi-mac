@@ -68,7 +68,7 @@ private Q_SLOTS:
         if (onlcr) {
             // This Mac's kernel can emit an extra CR when an ONLCR write is
             // interrupted at the tty queue boundary. Reproduced with pty.fork,
-            // os.read and /bin/cat, without Qt/Kwi (Phase 2A control evidence).
+            // os.read and /bin/cat, without Qt/Kwi.
             // Validate all cooked bytes except that redundant carriage return.
             // The raw case above still requires the exact byte count and hash.
             while (captured.contains("\r\r\n"))

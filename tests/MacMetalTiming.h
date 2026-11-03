@@ -3,5 +3,5 @@
 #pragma once
 
 class QQuickWindow;
-// Opt-in diagnostics only; not part of ordinary performance acceptance runs.
+// Opt-in diagnostics only; excluded from standard performance measurements.
 bool watchMacMetalTiming(QQuickWindow *window);

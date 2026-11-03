@@ -13,7 +13,7 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 
-from feasibility import process_path
+from app_test_support import process_path
 
 
 def junit_status(path):
@@ -37,7 +37,7 @@ def main():
     parser.add_argument("--trace", type=int, choices=(0, 1), default=0)
     parser.add_argument("--seconds", type=int, default=60)
     parser.add_argument("--presented", action="store_true")
-    parser.add_argument("--gpu-trace", action="store_true", help="Diagnostic command-buffer timing; excluded from acceptance runs")
+    parser.add_argument("--gpu-trace", action="store_true", help="Diagnostic command-buffer timing; excluded from standard measurements")
     parser.add_argument("--render-loop", choices=("basic", "threaded"), help="Diagnostic Qt render-loop override")
     parser.add_argument("--background", action="store_true", help="Launch without activation; supported by background rendering and hidden idle fixtures")
     parser.add_argument("--scale-factor", type=float, choices=(.5, 1., 2.))

@@ -230,7 +230,7 @@ class MacPerformanceTest : public QObject
 
     bool fit(QQuickWindow *window, Kwi::TerminalSession *session, int columns, int rows)
     {
-        // Frozen Menlo 10 pt is 6 x 11.5 logical pixels at this Mac's 2x/72 DPI.
+        // Test font Menlo 10 pt is 6 x 11.5 logical pixels at this Mac's 2x/72 DPI.
         // Verify both the hardware condition and the resulting PTY grid.
         if (window->effectiveDevicePixelRatio() != 2 || qRound(window->screen()->logicalDotsPerInch()) != 72)
             return false;
@@ -923,7 +923,7 @@ private Q_SLOTS:
             const int profilePause = qBound(0, qEnvironmentVariableIntValue("KWI_PERF_PROFILE_PAUSE_MS"), 30000);
             if (profilePause) {
                 record(QStringLiteral("retained-memory-checkpoint"), {{QStringLiteral("samples"), samples}});
-                settle(profilePause); // Optional heap inspection only; off for acceptance runs.
+                settle(profilePause); // Optional heap inspection only; off for standard measurements.
             }
         }
         if (auto *engine = qmlEngine(window))

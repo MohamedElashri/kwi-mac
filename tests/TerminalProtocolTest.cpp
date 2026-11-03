@@ -57,7 +57,7 @@ private Q_SLOTS:
         GhosttyQt::Terminal terminal{80, 24};
         QVERIFY(terminal.resize(80, 24, {9, 18}));
         terminal.setTerminfoName("xterm-256color");
-        terminal.setApplicationIdentity("Kwi phase6");
+        terminal.setApplicationIdentity("Kwi test");
         QByteArray replies;
         connect(&terminal, &GhosttyQt::Terminal::writeRequested, this, [&](const QByteArray &bytes) {
             replies += bytes;
@@ -68,7 +68,7 @@ private Q_SLOTS:
         QVERIFY(replies.contains("\033[8;24;80t"));
         QVERIFY(replies.contains("\033[4;432;720t"));
         QVERIFY(replies.contains("\033[6;18;9t"));
-        QVERIFY(replies.contains("Kwi phase6"));
+        QVERIFY(replies.contains("Kwi test"));
         QVERIFY(replies.contains("\033[?62;22c"));
         QVERIFY(replies.contains("\033[>1;10;0c"));
         QVERIFY(terminal.feed("\033[2J\033[Hprimary\033[?1049halternate"));
@@ -216,7 +216,7 @@ private Q_SLOTS:
         for (const auto medium : {'f', 't', 's'}) {
             replies.clear();
             const QByteArray command = "a=T,t=" + QByteArray(1, medium) + ",f=32,s=1,v=1,i=7";
-            QVERIFY(terminal.feed(graphics(command, medium != 's' ? QFile::encodeName(path) : QByteArray("/kwi-phase6-nonexistent-shm"))));
+            QVERIFY(terminal.feed(graphics(command, medium != 's' ? QFile::encodeName(path) : QByteArray("/kwi-protocol-test-missing-shm"))));
             QVERIFY2(replies.contains("EINVAL: unsupported medium"), replies.constData());
             GhosttyQt::Frame frame;
             QVERIFY(terminal.snapshot(frame));

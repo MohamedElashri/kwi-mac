@@ -12,16 +12,7 @@ import sys
 import unicodedata
 
 
-def ensure_kwi_not_running(lock=None):
-    lock = lock if lock is not None else Path(f"/tmp/org.kde.kwi-{os.geteuid()}.socket.lock")
-    if not lock.exists():
-        return
-    owner = int(lock.read_text().splitlines()[0])
-    try:
-        os.kill(owner, 0)
-    except ProcessLookupError:
-        return  # QLockFile handles stale endpoint cleanup.
-    raise RuntimeError("Close the existing Kwi instance before measuring; it was not modified")
+from app_test_support import ensure_kwi_not_running
 
 
 def trace_clock_ns():

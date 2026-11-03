@@ -1,138 +1,192 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Kwi contributors
 # SPDX-License-Identifier: CC0-1.0
-"""First-bundle startup/output diagnostics, with logical completion and frame callbacks."""
+"""Isolated Mac-only Kwi/Ghostty parser calibration; DSR is not presentation."""
 import argparse
 import hashlib
 import json
-import math
 import os
 from pathlib import Path
-import resource
+import signal
 import statistics
 import subprocess
+import sys
 import time
 
-from smoke import records, trace_clock_ns
+from smoke import records, completion, trace_clock_ns
+from app_test_support import activate_owned_app, ensure_kwi_not_running, executable, isolated_profile, process_path, wait_json
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
-def percentile(values, p):
-    values = sorted(values)
-    return values[min(len(values) - 1, max(0, math.ceil(len(values) * p) - 1))] if values else None
-
-
-def measure(app, workload, directory):
-    directory.mkdir(parents=True, exist_ok=True)
-    path = directory / "trace.log"
-    env = {k: os.environ[k] for k in ("HOME", "USER", "LOGNAME") if k in os.environ}
-    env.update(PATH="/usr/bin:/bin:/usr/sbin:/sbin", LANG="en_US.UTF-8", KWI_TRACE="1", KWI_TRACE_MARKER="KWI_WORKLOAD_DONE")
-    command = '/bin/cat "$1"; printf "\\030\\033[0m\\r\\nKWI_WORKLOAD_DONE\\r\\n"'
-    before = resource.getrusage(resource.RUSAGE_CHILDREN)
+def measure(args, directory, home):
+    if args.terminal == "kwi":
+        ensure_kwi_not_running()
+    directory.mkdir(parents=True, exist_ok=False)
+    isolated_profile(home, args.width, args.height, args.opacity, args.history)
+    env = {k: os.environ[k] for k in ("USER", "LOGNAME") if k in os.environ}
+    env.update(HOME=str(home), CFFIXED_USER_HOME=str(home), PATH="/usr/bin:/bin:/usr/sbin:/sbin", LANG="en_US.UTF-8")
+    child = [sys.executable, str(ROOT / "scripts/macos/pty-workload.py"), "--directory", str(directory)]
+    if args.workload:
+        child += ["--workload", str(args.workload)]
+    if args.keep_viewport:
+        child += ["--keep-viewport"]
+    if args.seconds:
+        child += ["--seconds", str(args.seconds), "--rate", str(args.rate)]
+    app_executable = executable(args.app)
+    if args.terminal == "kwi":
+        if args.presentation_library:
+            env.update(DYLD_INSERT_LIBRARIES=str(args.presentation_library), KWI_PRESENTATION_TRACE=str(directory / "drawables.jsonl"))
+        if args.trace:
+            env.update(KWI_TRACE=str(args.trace), KWI_TRACE_MARKER="KWI_BENCHMARK_DONE")
+        command = [str(app_executable), "--hold", "-e", *child]
+    else:
+        # Launch Services is the supported Ghostty.app entry point. Explicit env
+        # forwarding and config-default-files=false isolate the user's settings.
+        command = ["/usr/bin/open", "-n", "-W", "-a", str(args.app)]
+        for key, value in env.items():
+            command += ["--env", f"{key}={value}"]
+        command += ["--args", "--config-default-files=false", "--window-save-state=never", "--font-family=Menlo", "--font-size=10",
+                    f"--window-width={args.columns}", f"--window-height={args.rows}", "--window-inherit-font-size=false",
+                    "--window-inherit-working-directory=false", f"--scrollback-limit-lines={args.history if args.history >= 0 else 'unlimited'}",
+                    "--scrollback-limit-bytes=unlimited", f"--background-opacity={args.opacity}", "--background-blur=false",
+                    "--cursor-style-blink=false", "--shell-integration=none", "--wait-after-command=true", "-e", *child]
+    app_pid = None
     started = trace_clock_ns()
-    process = None
-    try:
-        with path.open("w") as stream:
-            process = subprocess.Popen([str(app / "Contents/MacOS/kwi"), "--hold", "-e", "/bin/sh", "-c", command, "kwi-benchmark", str(workload)],
-                                       env=env, stdout=stream, stderr=subprocess.STDOUT)
-            deadline = time.monotonic() + 120
-            events = []
-            pending = ""
-            marker_event = None
-            prepared_event = None
-            frame_time = None
-            with path.open(encoding="utf-8", errors="replace") as reader:
+    with (directory / "app.log").open("w") as log:
+        process = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            ready = wait_json(directory / "ready.json", process, 30)
+            candidate = ready["parent_pid"]
+            chain = []
+            for _ in range(8):
+                path = process_path(candidate)
+                chain.append({"pid": candidate, "path": str(path)})
+                if path.samefile(app_executable):
+                    break
+                if args.terminal == "kwi" or candidate <= 1:
+                    raise RuntimeError(f"App identity differs: {chain}")
+                candidate = int(subprocess.check_output(["/bin/ps", "-p", str(candidate), "-o", "ppid="], text=True, timeout=5))
+            else:
+                raise RuntimeError(f"App is not in the bounded launch ancestry: {chain}")
+            if args.terminal == "kwi" and candidate != process.pid:
+                raise RuntimeError("An existing instance received the request")
+            app_pid = candidate
+            foreground = activate_owned_app(args.app, app_pid) if args.terminal == "kwi" else None
+            (directory / "start").touch()
+            result = wait_json(directory / "result.json", process, max(100, args.seconds + 20))
+            result["spawn_to_child_ready_ms"] = (ready["ready_ns"] - started) / 1e6
+            if not args.probe and (result["initial_geometry"]["columns"], result["initial_geometry"]["rows"]) != (args.columns, args.rows):
+                raise RuntimeError(f"Viewport is {result['initial_geometry']}, expected {args.columns}x{args.rows}")
+            if not result["geometry_stable"]:
+                raise RuntimeError("Viewport changed during the workload")
+            if args.trace:
+                deadline = time.monotonic() + 5
+                submitted = None
                 while time.monotonic() < deadline:
-                    pending += reader.read()
-                    split = pending.rfind("\n")
-                    chunk, pending = pending[:split + 1], pending[split + 1:]
-                    new = records(chunk)
-                    events.extend(new)
-                    for event in new:
-                        if event["kind"] == "marker-snapshot":
-                            marker_event, prepared_event = event, None
-                        if event["kind"] == "render" and marker_event and event["terminal_id"] == marker_event["terminal_id"] and event["generation"] >= marker_event["generation"]:
-                            prepared_event = event
-                        if event["kind"] == "frame-swapped" and prepared_event is not None and event["time_ns"] >= prepared_event["time_ns"]:
-                            frame_time = event["time_ns"]
-                            break
-                    if frame_time is not None:
+                    events = records((directory / "app.log").read_text(errors="replace"))
+                    submitted = completion(events)
+                    if submitted:
                         break
-                    if process.poll() is not None:
-                        raise RuntimeError(f"App exited before logical completion: {path}")
-                    time.sleep(0.1)
-                else:
-                    raise RuntimeError(f"No logical marker/frame before timeout: {path}")
-            markers = [e for e in events if e["kind"] == "marker-snapshot"]
-            frames = [e for e in events if e["kind"] == "frame-swapped"]
-            feeds = [e for e in events if e["kind"] == "feed"]
-            snapshots = [e for e in events if e["kind"] == "snapshot"]
-            render = [e for e in events if e["kind"] == "render"]
-            configuration = [e for e in events if e["kind"] == "configuration"]
-            windows = [e for e in events if e["kind"] == "window"]
-            startup = next(e for e in events if e["kind"] == "startup")
-            completed = frame_time
-            first_feed = feeds[0]["start_ns"]
-            bytes_read = sum(e["bytes"] for e in feeds)
-            active_frames = [e["time_ns"] for e in frames if first_feed <= e["time_ns"] <= completed]
-            frame_intervals = [(right - left) / 1e6 for left, right in zip(active_frames, active_frames[1:])]
-            result = {"spawn_to_first_frame_callback_ms": (frames[0]["time_ns"] - started) / 1e6,
-                      "spawn_to_main_ms": (startup["main_start_ns"] - started) / 1e6,
-                      "main_to_first_frame_callback_ms": (frames[0]["time_ns"] - startup["main_start_ns"]) / 1e6,
-                      "first_feed_to_marker_frame_ms": (completed - first_feed) / 1e6,
-                      "pty_bytes": bytes_read, "feed_calls": len(feeds),
-                      "pty_mib_per_second": bytes_read / 1024**2 / ((completed - first_feed) / 1e9),
-                      "feed_ms_p95": percentile([e["elapsed_ns"] / 1e6 for e in feeds], .95),
-                      "feed_ms_max": max(e["elapsed_ns"] for e in feeds) / 1e6,
-                      "snapshot_ms_p95": percentile([e["elapsed_ns"] / 1e6 for e in snapshots], .95),
-                      "prepare_ms_p95": percentile([e["prepare_ns"] / 1e6 for e in render], .95),
-                      "output_frame_callback_interval_ms_p95": percentile(frame_intervals, .95),
-                      "output_frame_callback_interval_ms_max": max(frame_intervals) if frame_intervals else None,
-                      "viewport": {k: snapshots[-1][k] for k in ("columns", "rows")},
-                      "window": {k: windows[-1][k] for k in ("width", "height", "dpr", "refresh_hz", "accessibility_active")},
-                      "prepared_marker_generation": prepared_event["generation"],
-                      "render_counters_at_completion": {k: prepared_event[k] for k in
-                                                        ("shaped_runs", "rasterized_glyphs", "upload_bytes", "rebuilt_rows", "atlas_bytes")},
-                      "logical_marker_and_following_frame": True}
-            result["configuration"] = configuration
-    finally:
-        if process and process.poll() is None:
-            process.terminate()
+                    time.sleep(.02)
+                if not submitted:
+                    raise RuntimeError("Logical completion was not prepared and followed by a frame callback")
+                result["prepared_marker_and_frame"] = submitted
+                result["spawn_to_first_frame_callback_ms"] = (next(e for e in events if e["kind"] == "frame-swapped")["time_ns"] - started) / 1e6
+                first_text = next((e for e in events if e["kind"] == "render" and e.get("rasterized_glyphs", 0) > 0), None)
+                if first_text:
+                    following = next(e for e in events if e["kind"] == "frame-swapped" and e["time_ns"] >= first_text["time_ns"])
+                    result["spawn_to_first_nonempty_prepared_frame_callback_ms"] = (following["time_ns"] - started) / 1e6
+            result["app_pid"] = app_pid
+            result["foreground_pid_at_start"] = foreground
+            result["launch_chain"] = chain
+            return result
+        finally:
+            (directory / "stop").touch()
+            time.sleep(.2)
+            if app_pid is not None:
+                # Identity is checked above; never terminate a forwarded/user instance.
+                try:
+                    os.kill(app_pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
             try:
-                process.wait(timeout=5)
+                process.wait(timeout=8)
             except subprocess.TimeoutExpired:
-                process.kill()
+                process.terminate()
                 process.wait(timeout=5)
-    after = resource.getrusage(resource.RUSAGE_CHILDREN)
-    result["cpu_seconds_app_and_descendants"] = (after.ru_utime + after.ru_stime) - (before.ru_utime + before.ru_stime)
-    result["trace_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
-    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app", type=Path, required=True)
-    parser.add_argument("--workload", type=Path, required=True)
+    parser.add_argument("--terminal", choices=("kwi", "ghostty"), required=True)
+    parser.add_argument("--workload", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--columns", type=int, default=120)
+    parser.add_argument("--rows", type=int, default=40)
+    parser.add_argument("--width", type=int, default=741)
+    parser.add_argument("--height", type=int, default=510)
+    parser.add_argument("--opacity", type=float, default=1)
+    parser.add_argument("--history", type=int, default=100000)
+    parser.add_argument("--trace", type=int, choices=(0, 1, 2), default=0)
     parser.add_argument("--iterations", type=int, default=5)
+    parser.add_argument("--seconds", type=float, default=0)
+    parser.add_argument("--rate", type=int, default=0)
+    parser.add_argument("--probe", action="store_true")
+    parser.add_argument("--keep-viewport", action="store_true")
+    parser.add_argument("--presentation-library", type=Path, help="Opt-in test-only Metal presentation instrumentation for Kwi")
+    parser.add_argument("--alternating-presentation-library", type=Path, help="Alternate control/instrumented pairs for overhead calibration")
     args = parser.parse_args()
-    app, workload = args.app.resolve(), args.workload.resolve()
-    if not 1 <= args.iterations <= 20:
-        parser.error("Use 1–20 measured iterations")
-    work = args.output.resolve().parent
-    warmup = measure(app, workload, work / "warmup")
+    if not 1 <= args.iterations <= 10 or not 0 <= args.seconds <= 60 or not 0 < args.opacity <= 1:
+        parser.error("Use 1–10 repetitions, 0–60 seconds and opacity in (0,1]")
+    args.app, args.output = args.app.resolve(), args.output.resolve()
+    if args.presentation_library:
+        args.presentation_library = args.presentation_library.resolve()
+        if args.terminal != "kwi" or not args.presentation_library.is_file():
+            parser.error("Presentation instrumentation requires Kwi and an existing test library")
+    if args.alternating_presentation_library:
+        args.alternating_presentation_library = args.alternating_presentation_library.resolve()
+        if args.terminal != "kwi" or args.presentation_library or not args.alternating_presentation_library.is_file():
+            parser.error("Alternating calibration requires Kwi, an existing library, and no --presentation-library")
+    if args.workload:
+        args.workload = args.workload.resolve()
+    # A campaign owns a fresh output/profile directory. Never overwrite a user's
+    # preferences or silently reuse part of an earlier measurement campaign.
+    args.output.mkdir(parents=True, exist_ok=False)
+    if args.alternating_presentation_library:
+        variants = {"control": {"runs": []}, "instrumented": {"runs": []}}
+        for name in variants:
+            args.presentation_library = args.alternating_presentation_library if name == "instrumented" else None
+            variants[name]["warmup"] = measure(args, args.output / name / "warmup", args.output / name / "profile-home")
+        for n in range(args.iterations):
+            for name in (list(variants) if n % 2 == 0 else list(reversed(variants))):
+                args.presentation_library = args.alternating_presentation_library if name == "instrumented" else None
+                run = measure(args, args.output / name / f"run-{n + 1}", args.output / name / "profile-home")
+                variants[name]["runs"].append(run)
+                print(f"{name} {n + 1}: {run['parser_mib_per_second']:.2f} MiB/s", flush=True)
+        for value in variants.values():
+            value["median_parser_mib_per_second"] = statistics.median(r["parser_mib_per_second"] for r in value["runs"])
+        slowdown = 1 - variants["instrumented"]["median_parser_mib_per_second"] / variants["control"]["median_parser_mib_per_second"]
+        result = {"scope": "Alternating paired overhead calibration; one warm-up + five measured runs per condition by default. Same trace level/grid/history/data.",
+                  "variants": variants, "slowdown_fraction": slowdown, "within_five_percent_budget": slowdown <= .05,
+                  "executable_sha256": hashlib.sha256(executable(args.app).read_bytes()).hexdigest(),
+                  "parameters": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()}}
+        (args.output / "summary.json").write_text(json.dumps(result, indent=2) + "\n")
+        return
+    home = args.output / "profile-home"
+    home.mkdir(exist_ok=True)
+    warmup = measure(args, args.output / "warmup", home)
     runs = []
     for n in range(args.iterations):
-        runs.append(measure(app, workload, work / f"run-{n + 1}"))
-        print(f"Run {n + 1}: {runs[-1]['pty_mib_per_second']:.2f} MiB/s", flush=True)
-    result = {"scope": "Diagnostic pilot; traces on, actual viewport, default history. Not the frozen Phase 2A performance gate.",
-              "percentile_method": "nearest rank",
-              "executable_sha256": hashlib.sha256((app / "Contents/MacOS/kwi").read_bytes()).hexdigest(),
-              "bundle_inputs_sha256": hashlib.sha256((app / "Contents/Resources/kwi-bundle.json").read_bytes()).hexdigest(),
-              "limits": "Logical snapshot and frame-swapped callback, not GPU/pixel presentation or input latency; logging overhead is uncalibrated.",
-              "workload": str(workload), "bytes": workload.stat().st_size, "sha256": hashlib.sha256(workload.read_bytes()).hexdigest(),
-              "warmup": warmup, "runs": runs,
-              "median_pty_mib_per_second": statistics.median(r["pty_mib_per_second"] for r in runs)}
-    args.output.write_text(json.dumps(result, indent=2) + "\n")
+        run = measure(args, args.output / f"run-{n + 1}", home)
+        runs.append(run)
+        print(f"{args.terminal} {n + 1}: {run['parser_mib_per_second']:.2f} MiB/s; {run['initial_geometry']['columns']}x{run['initial_geometry']['rows']}", flush=True)
+    result = {"terminal": args.terminal, "app": str(args.app), "executable_sha256": hashlib.sha256(executable(args.app).read_bytes()).hexdigest(),
+              "parameters": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
+              "scope": "Common PTY/DSR parser calibration, not pixel presentation. Untraced unless explicitly requested. Warm OS/disk cache after one warmup; fresh process per run.",
+              "warmup": warmup, "runs": runs, "median_parser_mib_per_second": statistics.median(r['parser_mib_per_second'] for r in runs)}
+    (args.output / "summary.json").write_text(json.dumps(result, indent=2) + "\n")
 
 
 if __name__ == "__main__":

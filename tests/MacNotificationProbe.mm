@@ -38,7 +38,7 @@ int main(int argc, char **argv)
     pidFile.close();
     QApplication app{argc, argv};
     QCoreApplication::setApplicationName(QStringLiteral("kwi"));
-    const QString marker{QStringLiteral("Kwi Phase 3 check %1").arg(getpid())};
+    const QString marker{QStringLiteral("Kwi notification check %1").arg(getpid())};
     QPointer<KNotification> notification = new KNotification{QStringLiteral("notification"), KNotification::CloseOnTimeout, &app};
     notification->setComponentName(QStringLiteral("kwi"));
     notification->setTitle(marker);

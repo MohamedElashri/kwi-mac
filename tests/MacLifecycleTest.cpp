@@ -72,7 +72,7 @@ qint64 footprint()
 }
 }
 
-class MacSliceTest : public QObject
+class MacLifecycleTest : public QObject
 {
     Q_OBJECT
     std::unique_ptr<Kwi::TerminalSettings> m_settings;
@@ -80,7 +80,7 @@ class MacSliceTest : public QObject
     std::unique_ptr<Kwi::AppShortcuts> m_shortcuts;
     std::unique_ptr<Kwi::TerminalPaletteModel> m_palettes;
 
-    bool inputProxy(QQuickWindow *window, Kwi::TerminalView *view, Kwi::TerminalSession *session, const QString &condition)
+    bool inputEcho(QQuickWindow *window, Kwi::TerminalView *view, Kwi::TerminalSession *session, const QString &condition)
     {
         if (view->session() != session)
             return false;
@@ -148,7 +148,7 @@ class MacSliceTest : public QObject
                        << "history before/after" << beforeClear << session->historyText().size();
             return false;
         }
-        qInfo().noquote() << "SLICE_INPUT_PROXY"
+        qInfo().noquote() << "INPUT_ECHO_TIMING"
                           << QJsonDocument{QJsonObject{
                                                {QStringLiteral("condition"), condition},
                                                {QStringLiteral("focus_reacquisitions"), focusReacquisitions},
@@ -168,7 +168,7 @@ private Q_SLOTS:
     void initTestCase()
     {
         QStandardPaths::setTestModeEnabled(true);
-        QCoreApplication::setApplicationName(QStringLiteral("kwi-macos-slice-test"));
+        QCoreApplication::setApplicationName(QStringLiteral("kwi-macos-lifecycle-test"));
         QApplication::setQuitOnLastWindowClosed(false);
         BreezeIcons::initIcons();
         KirigamiAppDefaults::apply(qApp);
@@ -246,7 +246,7 @@ private Q_SLOTS:
         view->setCursorBlinking(false);
         QVERIFY(session->sendInput(QStringLiteral("printf 'KWI_UI_%s\\n' READY\n")));
         QTRY_VERIFY_WITH_TIMEOUT(session->historyText().contains(QLatin1String("KWI_UI_READY")), 5000);
-        QVERIFY(inputProxy(window, view, session, QStringLiteral("idle")));
+        QVERIFY(inputEcho(window, view, session, QStringLiteral("idle")));
         const QString ascii{QStringLiteral(KWI_TEST_WORKLOADS "/ascii-64MiB.bin")};
         QVERIFY(QFile::exists(ascii));
         Kwi::LaunchOptions background;
@@ -257,7 +257,7 @@ private Q_SLOTS:
         auto *producer = model->currentSession();
         model->setCurrentIndex(0);
         QTRY_VERIFY_WITH_TIMEOUT(view->session() == session, 5000);
-        QVERIFY(inputProxy(window, view, session, QStringLiteral("another tab producing 64MiB ASCII")));
+        QVERIFY(inputEcho(window, view, session, QStringLiteral("another tab producing 64MiB ASCII")));
         QVERIFY(awaitGui(
             [&] {
                 return producer->isFinished();
@@ -470,7 +470,7 @@ int main(int argc, char **argv)
     const bool tracing{qEnvironmentVariableIntValue("KWI_TRACE") == 1};
     qunsetenv("KWI_TRACE");
     app.setProperty("kwiTrace", tracing);
-    MacSliceTest test;
+    MacLifecycleTest test;
     return QTest::qExec(&test, argc, argv);
 }
-#include "MacSliceTest.moc"
+#include "MacLifecycleTest.moc"

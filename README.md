@@ -41,7 +41,7 @@ open build-macos/package/Kwi.app
 For native GUI checks, generate fixtures with `python3 scripts/macos/workloads.py`,
 then run CTest without `-LE gui` in a logged-in Mac session with the test windows
 left focused. The interaction suite includes a repeatable settings/action audit.
-Builds, local reports and `plan.md` are ignored. Dependency pins live in
+Build output and local reports are ignored. Dependency pins live in
 `scripts/macos/craft.py` and `craft/`; the original upstream libraries remain in `libs/`.
 
 ## Releases

@@ -25,7 +25,6 @@ jobs:
           persist-credentials: false
       - name: Test build, packaging and measurement tools
         run: python3 -m unittest discover -s tests/macos -v
-      - name: Check whitespace and local-only plan
+      - name: Check whitespace
         run: |
           git diff --check
-          test -z "$(git ls-files plan.md)"

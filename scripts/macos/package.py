@@ -72,7 +72,7 @@ def publish(staged, destination):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prefix", type=Path, default=ROOT / "build-macos/craft-root")
-    parser.add_argument("--output", type=Path, default=ROOT / "build-macos/phase5/package")
+    parser.add_argument("--output", type=Path, default=ROOT / "build-macos/package")
     args = parser.parse_args()
     destination = args.output.absolute()
     check_output(destination)

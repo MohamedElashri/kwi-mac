@@ -159,7 +159,7 @@ def main():
         else:
             write_all(data, time.monotonic() + 90)
             written = len(data)
-        marker = b"KWI_FEASIBILITY_DONE"
+        marker = b"KWI_BENCHMARK_DONE"
         marker_row = geometry()["rows"] if args.keep_viewport else 1
         tail = f"\x18\x1b[0m\x1b[{marker_row};1H\x1b[2K".encode() if args.keep_viewport else b"\x18\x1b[0m\x1b[2J\x1b[H"
         write_all(tail + marker + b"\x1b[6n", time.monotonic() + 5)

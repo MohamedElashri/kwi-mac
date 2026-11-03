@@ -11,7 +11,7 @@ import subprocess
 import time
 import unicodedata
 
-from feasibility import ensure_kwi_not_running, executable, isolated_profile, process_path, wait_json
+from app_test_support import ensure_kwi_not_running, executable, isolated_profile, process_path, wait_json
 from smoke import records
 
 
@@ -36,8 +36,8 @@ def main():
     relative.mkdir(parents=True)
     presets = home / "Library/Application Support/kwi/presets"
     presets.mkdir(parents=True)
-    (presets / "phase3.preset").write_text(
-        "[General]\nFormat=KwiLaunchPreset\nVersion=1\nName=Phase 3\n"
+    (presets / "test.preset").write_text(
+        "[General]\nFormat=KwiLaunchPreset\nVersion=1\nName=Compatibility test\n"
         "[Launch]\nDirectoryMode=Custom\nDirectory=" + str(folder) + "\n"
         "Environment=KWI_PRESET=literal = spaced ; $HOME\n")
     capture = output / "capture.py"
@@ -50,12 +50,12 @@ data = {"pid": os.getpid(), "parent_pid": os.getppid(), "cwd": os.getcwd(),
 temporary = target.with_suffix(".partial")
 temporary.write_text(json.dumps(data))
 os.replace(temporary, target)
-print("KWI_PHASE3_CAPTURE", flush=True)
+print("KWI_COMPATIBILITY_CAPTURE", flush=True)
 ''')
     env = {key: os.environ[key] for key in ("USER", "LOGNAME") if key in os.environ}
     env.update(HOME=str(home), CFFIXED_USER_HOME=str(home), PATH="/usr/bin:/bin:/usr/sbin:/sbin",
                DBUS_SESSION_BUS_ADDRESS="unix:path=" + str(output / "absent-bus.socket"),
-               KWI_TRACE="2", KWI_TRACE_MARKER="KWI_PHASE3_CAPTURE")
+               KWI_TRACE="2", KWI_TRACE_MARKER="KWI_COMPATIBILITY_CAPTURE")
     literal = ["space argument", "", "literal ; $HOME $(false)", "Unicode-é"]
     cases = []
     pending = []
@@ -63,7 +63,7 @@ print("KWI_PHASE3_CAPTURE", flush=True)
     log_path = output / "app.log"
     with log_path.open("w") as log:
         first_path = output / "first.json"
-        primary = subprocess.Popen([str(binary), "--preset", "Phase 3", "--hold", "--tab-title", "Phase 3 title", "-e",
+        primary = subprocess.Popen([str(binary), "--preset", "Compatibility test", "--hold", "--tab-title", "Compatibility title", "-e",
                                     "/usr/bin/python3", str(capture), str(first_path), *literal],
                                    cwd=output, env=env, stdout=log, stderr=subprocess.STDOUT)
         try:
@@ -108,7 +108,7 @@ print("KWI_PHASE3_CAPTURE", flush=True)
             for number in range(2):
                 destination = output / f"concurrent-{number}.json"
                 values = [*literal, str(number)]
-                command = [str(binary), "--new-tab", "--noclose", "--preset", "Phase 3", "--workdir", relative.name,
+                command = [str(binary), "--new-tab", "--noclose", "--preset", "Compatibility test", "--workdir", relative.name,
                            "-e", "/usr/bin/python3", str(capture), str(destination), *values]
                 pending.append((subprocess.Popen(command, cwd=relative.parent, env=env,
                                                   stdout=log, stderr=subprocess.STDOUT), destination, values))
@@ -134,7 +134,7 @@ print("KWI_PHASE3_CAPTURE", flush=True)
                       "app": str(app), "executable_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
                       "cases": cases, "captures": captures, "metal_api": 6,
                       "unicode_comparison": "NFC equivalence for macOS filesystem/argv encoding; other literal bytes and empty arguments preserved",
-                      "exit_status_contract": "Parser/activation acceptance status, not the child command's exit status"}
+                      "exit_status_contract": "CLI/activation status, not the child command's exit status"}
             (output / "summary.json").write_text(json.dumps(result, indent=2) + "\n")
             print(json.dumps(result, indent=2))
         finally:

@@ -11,7 +11,7 @@ import statistics
 import subprocess
 import time
 
-from feasibility import executable, isolated_profile, process_path, ensure_kwi_not_running
+from app_test_support import executable, isolated_profile, process_path, ensure_kwi_not_running
 from smoke import records, completion, trace_clock_ns
 from presentation import presented_trace_time_ns
 

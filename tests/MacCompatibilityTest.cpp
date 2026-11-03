@@ -170,7 +170,7 @@ private Q_SLOTS:
         launch.directoryMode = Kwi::LaunchSettings::DirectoryMode::Custom;
         launch.directory = directory.path();
         launch.environment = {QStringLiteral("KWI_VALUE=literal = spaced ; $HOME")};
-        const QString name{QStringLiteral("Phase 3-é")};
+        const QString name{QStringLiteral("Test preset-é")};
         QVERIFY(m_presets->savePreset(name, launch));
         QVERIFY(m_presets->setDefaultPreset(name));
         const auto state = readState(directory.filePath(QStringLiteral("persisted.json")));
@@ -253,21 +253,21 @@ private Q_SLOTS:
         QVERIFY(!original.isEmpty());
         const auto ansi = original.value(QStringLiteral("ansi")).toList();
         QCOMPARE(ansi.size(), 16);
-        QVERIFY(m_palettes->saveScheme({}, QStringLiteral("Phase 3 colors-é"), QColor{Qt::white}, QColor{Qt::black}, ansi));
+        QVERIFY(m_palettes->saveScheme({}, QStringLiteral("Test colors-é"), QColor{Qt::white}, QColor{Qt::black}, ansi));
         const QString id = m_settings->colorScheme();
         QVERIFY(id.startsWith(QLatin1String("user:")));
         QCOMPARE(m_palettes->schemeData(id).value(QStringLiteral("foreground")).value<QColor>(), QColor{Qt::white});
         QTemporaryDir directory;
         const auto state = readState(directory.filePath(QStringLiteral("palette.json")));
         QCOMPARE(state.value(QStringLiteral("scheme")).toString(), id);
-        QVERIFY(m_palettes->saveScheme(id, QStringLiteral("Phase 3 edited"), QColor{Qt::yellow}, QColor{Qt::black}, ansi));
+        QVERIFY(m_palettes->saveScheme(id, QStringLiteral("Edited colors"), QColor{Qt::yellow}, QColor{Qt::black}, ansi));
         QCOMPARE(m_palettes->schemeData(id).value(QStringLiteral("foreground")).value<QColor>(), QColor{Qt::yellow});
         const auto source = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/kwi/color-schemes/user/") + id.mid(5);
         const auto importedPath = directory.filePath(QStringLiteral("imported.colorscheme"));
         QVERIFY(QFile::copy(source, importedPath));
         {
             KConfig imported{importedPath, KConfig::SimpleConfig};
-            KConfigGroup(&imported, QStringLiteral("General")).writeEntry("Description", QStringLiteral("Imported phase 3"));
+            KConfigGroup(&imported, QStringLiteral("General")).writeEntry("Description", QStringLiteral("Imported colors"));
             QVERIFY(imported.sync());
         }
         QVERIFY(m_palettes->importScheme(QUrl::fromLocalFile(importedPath)));
@@ -317,7 +317,7 @@ private Q_SLOTS:
         Kwi::LaunchOptions options;
         options.launch.command = QStringList{QStringLiteral("/bin/sh"), QStringLiteral("-i")};
         options.launch.directory = directory.path();
-        options.title = QStringLiteral("Phase 3 custom title");
+        options.title = QStringLiteral("Custom terminal title");
         auto *first = windows.launch(options);
         QVERIFY(first && activateMacTestWindow(first, 10000));
         auto *source = windows.sessions(first);
@@ -391,7 +391,7 @@ private Q_SLOTS:
         desktop.openCurrentDirectory(nullptr);
         QVERIFY(!desktop.errorString().isEmpty());
         Kwi::WebShortcutModel providers;
-        providers.refresh(QStringLiteral("phase three literal & Unicode-é"));
+        providers.refresh(QStringLiteral("search literal & Unicode-é"));
         QVERIFY(providers.count() > 0);
         const auto url = providers.searchUrl(0);
         QVERIFY(url.isValid() && url.scheme() == QLatin1String("https"));
@@ -505,8 +505,8 @@ private Q_SLOTS:
         QCOMPARE(session.progressState(), Kwi::Session::ProgressState::Indeterminate);
         session.feed("\033]9;4;4;50\a");
         QCOMPARE(session.progressState(), Kwi::Session::ProgressState::Paused);
-        session.feed("\033]0;Phase 3 title\a");
-        QCOMPARE(session.applicationTitle(), QStringLiteral("Phase 3 title"));
+        session.feed("\033]0;Terminal title\a");
+        QCOMPARE(session.applicationTitle(), QStringLiteral("Terminal title"));
         session.resetTerminal();
         QCOMPARE(session.progressState(), Kwi::Session::ProgressState::None);
         QVERIFY(!session.hasApplicationTitle());

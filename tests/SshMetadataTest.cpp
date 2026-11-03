@@ -48,13 +48,13 @@ private Q_SLOTS:
         QVERIFY(endpoint.listen(QHostAddress::LocalHost));
         QFile config{directory.filePath(QStringLiteral("ssh config-é"))};
         QVERIFY(config.open(QIODevice::WriteOnly));
-        config.write("Host phase3\n HostName 127.0.0.1\n User alice\n Port ");
+        config.write("Host test-host\n HostName 127.0.0.1\n User alice\n Port ");
         config.write(QByteArray::number(endpoint.serverPort()));
         config.write("\n CanonicalizeHostname no\n BatchMode yes\n ConnectTimeout 10\n ControlMaster no\n");
         config.close();
         const QStringList arguments{QStringLiteral("-F"),
                                     config.fileName(),
-                                    QStringLiteral("phase3"),
+                                    QStringLiteral("test-host"),
                                     QStringLiteral("printf"),
                                     QStringLiteral("literal ; $HOME")};
         QProcess client;

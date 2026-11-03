@@ -6,6 +6,7 @@ import importlib.util
 import contextlib
 import io
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -16,31 +17,30 @@ ROOT = Path(__file__).resolve().parents[2]
 def load(name):
     spec = importlib.util.spec_from_file_location(name, ROOT / "scripts/macos" / (name + ".py"))
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    with mock.patch.object(sys, "path", [str(ROOT / "scripts/macos"), *sys.path]):
+        spec.loader.exec_module(module)
     return module
 
 
 class BuildToolsTest(unittest.TestCase):
     def test_measurement_does_not_forward_to_a_live_app(self):
-        with mock.patch.dict("sys.modules", {"smoke": load("smoke")}):
-            feasibility = load("feasibility")
+        app_test_support = load("app_test_support")
         with tempfile.TemporaryDirectory() as directory:
             lock = Path(directory) / "owned.socket.lock"
             lock.write_text("12345\nkwi\n")
-            with mock.patch.object(feasibility.os, "kill") as check:
+            with mock.patch.object(app_test_support.os, "kill") as check:
                 with self.assertRaisesRegex(RuntimeError, "not modified"):
-                    feasibility.ensure_kwi_not_running(lock)
+                    app_test_support.ensure_kwi_not_running(lock)
                 check.assert_called_once_with(12345, 0)
             self.assertEqual(lock.read_text(), "12345\nkwi\n")
 
     def test_measurement_leaves_stale_endpoint_cleanup_to_qt(self):
-        with mock.patch.dict("sys.modules", {"smoke": load("smoke")}):
-            feasibility = load("feasibility")
+        app_test_support = load("app_test_support")
         with tempfile.TemporaryDirectory() as directory:
             lock = Path(directory) / "owned.socket.lock"
             lock.write_text("12345\nkwi\n")
-            with mock.patch.object(feasibility.os, "kill", side_effect=ProcessLookupError):
-                feasibility.ensure_kwi_not_running(lock)
+            with mock.patch.object(app_test_support.os, "kill", side_effect=ProcessLookupError):
+                app_test_support.ensure_kwi_not_running(lock)
             self.assertTrue(lock.exists())
 
     def test_output_completion_requires_matching_prepared_terminal(self):

@@ -12,7 +12,7 @@ import socket
 import subprocess
 import time
 
-from feasibility import executable, isolated_profile, process_path, ensure_kwi_not_running
+from app_test_support import executable, isolated_profile, process_path, ensure_kwi_not_running
 
 
 def alive(pid):

@@ -72,6 +72,8 @@ struct Frame {
     quint64 terminalId{0}; // Producer identity. Generations are local to this terminal.
     QVector<QVector<Cell>> rows;
     QVector<bool> rowWrapped;
+    QString bidiPrefix; // Logical text before a viewport-clipped wrapped paragraph.
+    QString bidiSuffix; // Logical text after a viewport-clipped wrapped paragraph.
     QVector<quint64> rowVersions;
     QVector<std::array<quint64, 2>> rowIdentities;
     QVector<ImagePlacement> images; // Paint order: layer, z, imageId, placementId.

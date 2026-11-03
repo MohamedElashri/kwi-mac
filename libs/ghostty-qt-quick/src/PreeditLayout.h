@@ -30,5 +30,6 @@ struct PreeditLayout {
     QColor caretColor;
 };
 
+[[nodiscard]] Frame frameWithPreedit(const Frame &frame, const PreeditLayout &preedit);
 [[nodiscard]] PreeditLayout layoutPreedit(const Frame &frame, const QString &text, const QList<QInputMethodEvent::Attribute> &attributes);
 }

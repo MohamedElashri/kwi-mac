@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "BidiLayout.h"
 #include <Frame.h>
 #include <QString>
 
@@ -37,6 +38,8 @@ public:
         QRegion hoveredLink; // Viewport cell coordinates.
         QColor searchForeground;
         QColor searchBackground;
+        QVector<BidiRow> bidiRows;
+        bool composedPreedit{false};
         QString preedit;
         QList<QInputMethodEvent::Attribute> preeditAttributes;
     };

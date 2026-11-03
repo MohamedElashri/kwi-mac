@@ -31,6 +31,7 @@
 #include <limits>
 #include <mutex>
 #include <utility>
+#include <vector>
 
 namespace GhosttyQt
 {
@@ -185,12 +186,12 @@ bool decodePng(void *, const GhosttyAllocator *allocator, const uint8_t *data, s
     return true;
 }
 
-QString formattedSelection(GhosttyTerminal terminal, const GhosttySelection *selection)
+QString formattedSelection(GhosttyTerminal terminal, const GhosttySelection *selection, bool trim = true)
 {
     GhosttyTerminalSelectionFormatOptions options{GHOSTTY_INIT_SIZED(GhosttyTerminalSelectionFormatOptions)};
     options.emit = GHOSTTY_FORMATTER_FORMAT_PLAIN;
     options.unwrap = true;
-    options.trim = true;
+    options.trim = trim;
     options.selection = selection;
     uint8_t *bytes{nullptr};
     size_t length{0};
@@ -326,7 +327,9 @@ public:
 
     bool setSelection(const GhosttySelection *selection, bool viewportChanged = false)
     {
-        const bool changed{!selectionEquals(selection)};
+        const bool changed{!cellSelections.empty() || !selectionEquals(selection)};
+        customSelectionChanged |= !cellSelections.empty();
+        cellSelections.clear();
 
         if (changed && ghostty_terminal_set(terminal, GHOSTTY_TERMINAL_OPT_SELECTION, selection) != GHOSTTY_SUCCESS)
             return false;
@@ -466,6 +469,16 @@ public:
         ghostty_terminal_get(terminal, GHOSTTY_TERMINAL_DATA_SCROLLBAR, &scrollbar);
         frame.scrollTotal = scrollbar.total;
         frame.scrollOffset = scrollbar.offset;
+        QRegion extraSelection;
+        for (const auto &segment : cellSelections) {
+            GhosttyPointCoordinate start{}, end{};
+            if (ghostty_tracked_grid_ref_point(segment->start, GHOSTTY_POINT_TAG_SCREEN, &start) != GHOSTTY_SUCCESS
+                || ghostty_tracked_grid_ref_point(segment->end, GHOSTTY_POINT_TAG_SCREEN, &end) != GHOSTTY_SUCCESS)
+                continue;
+            for (qint64 y = qMax(qint64(start.y), qint64(frame.scrollOffset)); y <= qMin(qint64(end.y), qint64(frame.scrollOffset + height - 1)); ++y)
+                extraSelection +=
+                    QRect(y == start.y ? start.x : 0, int(y - frame.scrollOffset), (y == end.y ? end.x : cols - 1) - (y == start.y ? start.x : 0) + 1, 1);
+        }
         auto rowsHandle = rowIterator.value;
         ghostty_render_state_get(render, GHOSTTY_RENDER_STATE_DATA_ROW_ITERATOR, &rowsHandle);
         int rowIndex{0};
@@ -478,7 +491,7 @@ public:
             ghostty_render_state_row_get(rowIterator, GHOSTTY_RENDER_STATE_ROW_DATA_ID, &rowIdentity);
             frame.rowIdentities[y] = {rowIdentity.bits[0], rowIdentity.bits[1]};
 
-            if (!full && !rowDirty)
+            if (!full && !rowDirty && !customSelectionChanged)
                 continue;
 
             GhosttyRenderStateRowSelection selected{GHOSTTY_INIT_SIZED(GhosttyRenderStateRowSelection)};
@@ -490,7 +503,8 @@ public:
                 qsizetype first{0};
 
                 while (first < previous.size()
-                       && bool(previous[first].flags & Selected) == (hasRowSelection && first >= selected.start_x && first <= selected.end_x))
+                       && bool(previous[first].flags & Selected)
+                           == ((hasRowSelection && first >= selected.start_x && first <= selected.end_x) || extraSelection.contains(QPoint(first, y))))
                     ++first;
 
                 if (first < previous.size()) {
@@ -499,7 +513,8 @@ public:
                     for (qsizetype x{first}; x < cells.size(); ++x) {
                         auto &cell = cells[x];
 
-                        if (bool(cell.flags & Selected) != (hasRowSelection && x >= selected.start_x && x <= selected.end_x))
+                        if (bool(cell.flags & Selected)
+                            != ((hasRowSelection && x >= selected.start_x && x <= selected.end_x) || extraSelection.contains(QPoint(x, y))))
                             cell.flags ^= Selected;
                     }
 
@@ -529,7 +544,7 @@ public:
                 ghostty_render_state_row_cells_get_multi(rowCells, std::size(cellKeys), cellKeys, cellValues, nullptr);
                 GhosttyCellWide wide{GHOSTTY_CELL_WIDE_NARROW};
                 ghostty_cell_get(raw, GHOSTTY_CELL_DATA_WIDE, &wide);
-                cell.width = wide == GHOSTTY_CELL_WIDE_WIDE ? 2 : wide == GHOSTTY_CELL_WIDE_NARROW ? 1 : 0;
+                cell.width = wide == GHOSTTY_CELL_WIDE_WIDE ? 2 : wide == GHOSTTY_CELL_WIDE_SPACER_TAIL ? 0 : 1;
                 std::array<uint8_t, 64> text{};
                 GhosttyBuffer buffer{text.data(), text.size(), 0};
                 auto result = ghostty_render_state_row_cells_get(rowCells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_GRAPHEMES_UTF8, &buffer);
@@ -565,7 +580,8 @@ public:
                 if (cell.text.startsWith(QStringView(u"\U0010eeee")))
                     cell.flags |= ImagePlaceholder;
 
-                const bool isSelected{hasRowSelection && cells.size() >= selected.start_x && cells.size() <= selected.end_x};
+                const bool isSelected{(hasRowSelection && cells.size() >= selected.start_x && cells.size() <= selected.end_x)
+                                      || extraSelection.contains(QPoint(cells.size(), y))};
 
                 if (isSelected)
                     cell.flags |= Selected;
@@ -585,6 +601,47 @@ public:
 
             frame.rows[y] = std::move(cells);
             frame.rowVersions[y] = frame.generation;
+        }
+
+        frame.bidiPrefix.clear();
+        frame.bidiSuffix.clear();
+        // Include offscreen paragraph context without reading the entire scrollback.
+        // Extremely long paragraphs use a bounded context, just like the visible grid.
+        const quint64 contextRows = qMin<quint64>(256, 65536 / qMax(1, int(cols)));
+        auto screenRef = [&](quint64 y, int x = 0) {
+            GhosttyGridRef ref{GHOSTTY_INIT_SIZED(GhosttyGridRef)};
+            GhosttyPoint p{};
+            p.tag = GHOSTTY_POINT_TAG_SCREEN;
+            p.value.coordinate = {uint16_t(x), uint32_t(y)};
+            ghostty_terminal_grid_ref(terminal, p, &ref);
+            return ref;
+        };
+        auto wrapped = [&](quint64 y) {
+            auto ref = screenRef(y);
+            GhosttyRow row{};
+            bool value = false;
+            if (ghostty_grid_ref_row(&ref, &row) == GHOSTTY_SUCCESS)
+                ghostty_row_get(row, GHOSTTY_ROW_DATA_WRAP, &value);
+            return value;
+        };
+        quint64 beginning = frame.scrollOffset;
+        while (beginning > 0 && frame.scrollOffset - beginning < contextRows && wrapped(beginning - 1))
+            --beginning;
+        if (beginning < frame.scrollOffset) {
+            GhosttySelection selection{GHOSTTY_INIT_SIZED(GhosttySelection)};
+            selection.start = screenRef(beginning);
+            selection.end = screenRef(frame.scrollOffset - 1, cols - 1);
+            frame.bidiPrefix = formattedSelection(terminal, &selection).right(65536);
+        }
+        quint64 ending = frame.scrollOffset + height;
+        const quint64 afterViewport = ending;
+        while (ending < frame.scrollTotal && ending - afterViewport < contextRows && wrapped(ending - 1))
+            ++ending;
+        if (ending > afterViewport) {
+            GhosttySelection selection{GHOSTTY_INIT_SIZED(GhosttySelection)};
+            selection.start = screenRef(afterViewport);
+            selection.end = screenRef(ending - 1, cols - 1);
+            frame.bidiSuffix = formattedSelection(terminal, &selection).left(65536);
         }
 
         quint64 placementsGeneration{0};
@@ -704,6 +761,7 @@ public:
         ghostty_render_state_clean(render);
 
         // A synchronized-output callback may have captured a frame before the last bytes of this feed.
+        customSelectionChanged = false;
         contentInvalidated = feeding;
 
         return true;
@@ -721,6 +779,15 @@ public:
     Handle<GhosttyMouseEncoder, ghostty_mouse_encoder_free> mouseEncoder;
     Handle<GhosttyMouseEvent, ghostty_mouse_event_free> mouseEvent;
     GhosttySelectionGesture gesture{nullptr};
+    struct CellSelection {
+        Handle<GhosttyTrackedGridRef, ghostty_tracked_grid_ref_free> start;
+        Handle<GhosttyTrackedGridRef, ghostty_tracked_grid_ref_free> end;
+        quint64 line{0};
+        int column{0};
+    };
+    std::vector<std::unique_ptr<CellSelection>> cellSelections;
+    bool customSelectionChanged{false};
+    bool selectionAlternateScreen{false};
     Error error{Error::None};
     QByteArray identity{"libghostty-qt"};
     int columns{80};
@@ -970,6 +1037,8 @@ bool Terminal::feed(QByteArrayView bytes)
     d->feeding = true;
     ghostty_terminal_vt_write(d->terminal, reinterpret_cast<const uint8_t *>(bytes.data()), size_t(bytes.size()));
     d->feeding = false;
+    if (!d->cellSelections.empty() && d->selectionAlternateScreen != isModeEnabled(Mode::AlternateScreen))
+        d->setSelection(nullptr);
     bool processingError{false};
     ghostty_terminal_get(d->terminal, GHOSTTY_TERMINAL_DATA_VT_PROCESSING_ERROR, &processingError);
     d->tickImages();
@@ -1172,9 +1241,64 @@ bool Terminal::select(QPoint first, QPoint last, bool rectangle)
     return selection.start.node && selection.end.node && d->setSelection(&selection);
 }
 
+bool Terminal::selectCells(const QRegion &cells, qint64 firstScreenRow, qint64 lastScreenRow)
+{
+    d->assertThread();
+    d->resetGesture();
+    GhosttyTerminalScrollbar scrollbar{};
+    ghostty_terminal_get(d->terminal, GHOSTTY_TERMINAL_DATA_SCROLLBAR, &scrollbar);
+    std::vector<std::unique_ptr<Private::CellSelection>> retained;
+    if (firstScreenRow >= 0 && lastScreenRow >= firstScreenRow) {
+        for (auto &segment : d->cellSelections) {
+            GhosttyPointCoordinate start{}, end{};
+            if (ghostty_tracked_grid_ref_point(segment->start, GHOSTTY_POINT_TAG_SCREEN, &start) == GHOSTTY_SUCCESS
+                && ghostty_tracked_grid_ref_point(segment->end, GHOSTTY_POINT_TAG_SCREEN, &end) == GHOSTTY_SUCCESS && start.y >= firstScreenRow
+                && end.y <= lastScreenRow && (end.y < scrollbar.offset || start.y >= scrollbar.offset + d->rows)) {
+                segment->line = start.y;
+                segment->column = start.x;
+                retained.push_back(std::move(segment));
+            }
+        }
+    }
+    // Moved entries are null until the old collection is cleared.
+    d->cellSelections.erase(std::remove(d->cellSelections.begin(), d->cellSelections.end(), nullptr), d->cellSelections.end());
+    d->setSelection(nullptr);
+    d->cellSelections = std::move(retained);
+    d->selectionAlternateScreen = isModeEnabled(Mode::AlternateScreen);
+    const QRegion clipped = cells.intersected(QRect(0, 0, d->columns, d->rows));
+    for (int y = clipped.boundingRect().top(); !clipped.isEmpty() && y <= clipped.boundingRect().bottom(); ++y) {
+        for (int x = 0; x < d->columns;) {
+            if (!clipped.contains(QPoint(x, y))) {
+                ++x;
+                continue;
+            }
+            const int start = x++;
+            while (x < d->columns && clipped.contains(QPoint(x, y)))
+                ++x;
+            auto segment = std::make_unique<Private::CellSelection>();
+            segment->line = scrollbar.offset + y;
+            segment->column = start;
+            if (ghostty_terminal_grid_ref_track(d->terminal, point({start, y}), segment->start.out()) != GHOSTTY_SUCCESS
+                || ghostty_terminal_grid_ref_track(d->terminal, point({x - 1, y}), segment->end.out()) != GHOSTTY_SUCCESS) {
+                d->setSelection(nullptr);
+                return false;
+            }
+            d->cellSelections.push_back(std::move(segment));
+        }
+    }
+    std::sort(d->cellSelections.begin(), d->cellSelections.end(), [](const auto &a, const auto &b) {
+        return std::tie(a->line, a->column) < std::tie(b->line, b->column);
+    });
+    d->customSelectionChanged = true;
+    Q_EMIT frameChanged();
+    return true;
+}
+
 bool Terminal::selectionGesture(const SelectionEvent &input)
 {
     d->assertThread();
+    if (!d->cellSelections.empty())
+        d->setSelection(nullptr);
     GhosttySelectionGestureEventType type{GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_PRESS};
 
     switch (input.type) {
@@ -1379,7 +1503,10 @@ bool Terminal::hasSelection() const
     d->assertThread();
     GhosttySelection selection{GHOSTTY_INIT_SIZED(GhosttySelection)};
 
-    return ghostty_terminal_get(d->terminal, GHOSTTY_TERMINAL_DATA_SELECTION, &selection) == GHOSTTY_SUCCESS;
+    const bool custom = std::any_of(d->cellSelections.cbegin(), d->cellSelections.cend(), [](const auto &segment) {
+        return ghostty_tracked_grid_ref_has_value(segment->start) && ghostty_tracked_grid_ref_has_value(segment->end);
+    });
+    return custom || ghostty_terminal_get(d->terminal, GHOSTTY_TERMINAL_DATA_SELECTION, &selection) == GHOSTTY_SUCCESS;
 }
 
 void Terminal::clearSelection()
@@ -1508,7 +1635,21 @@ QString Terminal::selectionText() const
 {
     d->assertThread();
 
-    return formattedSelection(d->terminal, nullptr);
+    if (d->cellSelections.empty())
+        return formattedSelection(d->terminal, nullptr);
+    QString result;
+    std::optional<quint64> line;
+    for (const auto &segment : d->cellSelections) {
+        GhosttySelection selection{GHOSTTY_INIT_SIZED(GhosttySelection)};
+        if (ghostty_tracked_grid_ref_snapshot(segment->start, &selection.start) != GHOSTTY_SUCCESS
+            || ghostty_tracked_grid_ref_snapshot(segment->end, &selection.end) != GHOSTTY_SUCCESS)
+            continue;
+        if (line && *line != segment->line)
+            result += QLatin1Char('\n');
+        result += formattedSelection(d->terminal, &selection, false);
+        line = segment->line;
+    }
+    return result;
 }
 
 QString Terminal::historyText() const

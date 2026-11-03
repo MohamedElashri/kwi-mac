@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 Eike Hein <hein@kde.org>
-SPDX-FileCopyrightText: 2026 Mohamed Elashri <mail@elashri.com>
+SPDX-FileCopyrightText: 2026 Mohamed Elashri <kwi@elashri.com>
 SPDX-License-Identifier: CC0-1.0
 -->
 # <img src="logo.png" width="32" alt=""/> Kwi Mac

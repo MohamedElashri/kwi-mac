@@ -154,7 +154,8 @@ def draft_release(tag, directory):
             raise RuntimeError("Refusing to replace a published release")
     elif "release not found" not in state.stderr.lower():
         raise RuntimeError(state.stderr.strip() or "Cannot inspect GitHub release")
-    notes = (f"Kwi for macOS — Apple Silicon\n\nSource: {commit}\n\n"
+    notes = (f"Kwi Mac — Apple Silicon\n\nSource: {commit}\n\n"
+             "An independently maintained macOS fork of KDE Kwi.\n\n"
              "Extract Kwi.app from Kwi-arm64.zip and copy it to Applications.\n"
              "Ad-hoc signed; Developer ID signing and notarization are not configured.\n"
              "Headless CI tests and package audits pass. GUI/Metal checks remain local.\n"
@@ -170,7 +171,7 @@ def draft_release(tag, directory):
             subprocess.run(["gh", "release", "upload", tag, *assets, "--clobber"], check=True, cwd=ROOT)
             subprocess.run(["gh", "release", "edit", tag, *flags], check=True, cwd=ROOT)
         else:
-            subprocess.run(["gh", "release", "create", tag, *assets, "--verify-tag", "--title", f"Kwi for macOS {tag}", *flags], check=True, cwd=ROOT)
+            subprocess.run(["gh", "release", "create", tag, *assets, "--verify-tag", "--title", f"Kwi Mac {tag}", *flags], check=True, cwd=ROOT)
 
 
 def build(args):
@@ -205,7 +206,7 @@ def build(args):
         native = bundle.audit(restored)
         resources = bundle.inventory_resources(restored)
         (staged / "README.txt").write_text(
-            "Kwi for macOS — Apple Silicon\n\n"
+            "Kwi Mac — Apple Silicon\n\n"
             "Open Kwi.app, or copy it to a location on this Mac. Keep the app bundle intact.\n"
             "The ZIP contains the same verified app. No Craft shell or loader/QML environment overrides are needed.\n"
             "Ad-hoc signed; Developer ID signing and notarization are not configured.\n"

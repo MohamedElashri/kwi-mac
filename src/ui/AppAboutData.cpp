@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Eike Hein <hein@kde.org>
-// SPDX-FileCopyrightText: 2026 Mohamed Elashri <mail@elashri.com>
+// SPDX-FileCopyrightText: 2026 Mohamed Elashri <kwi@elashri.com>
 // SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 
 #include "AppAboutData.h"
@@ -29,7 +29,7 @@ KAboutData applicationAboutData()
     about.setProgramLogo(QVariant::fromValue(QIcon{QStringLiteral(":/icons/org.kde.kwi.svg")}));
     about.addAuthor(QStringLiteral("Mohamed Elashri"),
                     i18n("Maintainer; macOS integration and bidirectional text support"),
-                    QStringLiteral("mail@elashri.com"),
+                    QStringLiteral("kwi@elashri.com"),
                     QStringLiteral("https://github.com/MohamedElashri/kwi-mac"));
     about.addCredit(QStringLiteral("Eike Hein"),
                     i18n("Creator of KDE Kwi"),

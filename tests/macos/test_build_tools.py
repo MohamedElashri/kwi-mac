@@ -23,6 +23,14 @@ def load(name):
 
 
 class BuildToolsTest(unittest.TestCase):
+    def test_invalid_job_count_does_not_modify_a_prefix(self):
+        craft = load("craft")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "prefix"
+            with self.assertRaisesRegex(RuntimeError, "positive"):
+                craft.prepare(root, jobs=0)
+            self.assertFalse(root.exists())
+
     def test_measurement_does_not_forward_to_a_live_app(self):
         app_test_support = load("app_test_support")
         with tempfile.TemporaryDirectory() as directory:

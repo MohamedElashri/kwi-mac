@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import subprocess
@@ -19,6 +20,7 @@ import bundle
 
 OWNER = "kwi-macos-package-v1"
 ROOT = Path(__file__).resolve().parents[2]
+ASSET_FILES = ("Kwi-arm64.zip", "Kwi-sources.tar.gz", "SOURCES.json", "package.json", "Kwi.bundle.json", "README.txt", "dependencies.json")
 
 
 def digest(path):
@@ -53,8 +55,8 @@ def check_output(path):
             raise RuntimeError("Existing output is unowned or changed; preserve it and choose a fresh output")
 
 
-def publish(staged, destination):
-    check_output(destination)
+def publish(staged, destination, validate=check_output):
+    validate(destination)
     backup = destination.with_name("." + destination.name + ".previous-" + uuid.uuid4().hex)
     had_previous = destination.exists()
     if had_previous:
@@ -69,11 +71,109 @@ def publish(staged, destination):
         shutil.rmtree(backup)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--prefix", type=Path, default=ROOT / "build-macos/craft-root")
-    parser.add_argument("--output", type=Path, default=ROOT / "build-macos/package")
-    args = parser.parse_args()
+def verify_assets(directory, expected_commit=None):
+    if not directory.is_dir():
+        raise RuntimeError("Release assets directory does not exist; run make ci first")
+    if directory.is_symlink() or {p.name for p in directory.iterdir()} != {*ASSET_FILES, "SHA256SUMS"}:
+        raise RuntimeError("Release assets must contain exactly the expected files")
+    if any(p.is_symlink() or not p.is_file() for p in directory.iterdir()):
+        raise RuntimeError("Release assets must be regular files")
+    checksums = {}
+    for line in (directory / "SHA256SUMS").read_text().splitlines():
+        match = re.fullmatch(r"([0-9a-f]{64})  (.+)", line)
+        if not match or match[2] not in ASSET_FILES or match[2] in checksums:
+            raise RuntimeError("Invalid release checksum manifest")
+        checksums[match[2]] = match[1]
+    if set(checksums) != set(ASSET_FILES):
+        raise RuntimeError("Incomplete release checksum manifest")
+    for name, expected in checksums.items():
+        if digest(directory / name) != expected:
+            raise RuntimeError(f"Release asset changed: {name}")
+    record = json.loads((directory / "package.json").read_text())
+    sources = json.loads((directory / "SOURCES.json").read_text())
+    dependencies = json.loads((directory / "dependencies.json").read_text())
+    manifest = json.loads((directory / "Kwi.bundle.json").read_text())
+    commit = record["source"]["source_commit"]
+    if (not re.fullmatch(r"[0-9a-f]{40}", commit) or sources["project_commit"] != commit
+            or dependencies["source_commit"] != commit or (expected_commit and expected_commit != commit)):
+        raise RuntimeError("Release source identity does not match")
+    if (record["owner"] != OWNER or not record["full_deployment"] or manifest["reused_deployment"]
+            or not record["strict_signatures_original_and_extracted"] or not record["archive_round_trip_bytes_modes_symlinks"]):
+        raise RuntimeError("Release package verification is incomplete")
+    if (record["archive"]["name"] != "Kwi-arm64.zip" or record["archive"]["sha256"] != checksums["Kwi-arm64.zip"]
+            or record["archive"]["bytes"] != (directory / "Kwi-arm64.zip").stat().st_size
+            or record["source_distribution"]["archive"] != "Kwi-sources.tar.gz"
+            or record["source_distribution"]["sha256"] != checksums["Kwi-sources.tar.gz"]
+            or record["bundle_manifest_sha256"] != checksums["Kwi.bundle.json"]):
+        raise RuntimeError("Release metadata does not match its archives")
+    return commit
+
+
+def check_assets_output(directory):
+    if directory.is_symlink():
+        raise RuntimeError("Release asset output must not be a symlink")
+    if directory.exists():
+        verify_assets(directory)
+
+
+def assemble_assets(package_dir, dependencies, destination):
+    canonical = destination.resolve()
+    if canonical == package_dir or canonical.is_relative_to(package_dir) or package_dir.is_relative_to(canonical):
+        raise RuntimeError("Release assets and package directories must be separate")
+    check_assets_output(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".kwi-assets-", dir=destination.parent) as temporary:
+        staged = Path(temporary) / "assets"
+        staged.mkdir()
+        for name in ASSET_FILES:
+            shutil.copy2(dependencies if name == "dependencies.json" else package_dir / name, staged / name)
+        (staged / "SHA256SUMS").write_text("".join(f"{digest(staged / name)}  {name}\n" for name in ASSET_FILES))
+        verify_assets(staged)
+        publish(staged, destination, validate=check_assets_output)
+
+
+def validate_tag(tag):
+    if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-mac\.[0-9]+)?", tag):
+        raise RuntimeError("Set TAG to an existing version tag")
+    version = re.search(r"project\(kwi VERSION ([\d.]+)", (ROOT / "CMakeLists.txt").read_text())[1]
+    if tag.removeprefix("v").split("-mac.")[0] != version:
+        raise RuntimeError("Tag must match the CMake project version")
+    commit = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", f"refs/tags/{tag}^{{commit}}"], text=True).strip()
+    head = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
+    if commit != head:
+        raise RuntimeError("Check out the release tag before preparing a draft")
+    return commit
+
+
+def draft_release(tag, directory):
+    commit = validate_tag(tag)
+    verify_assets(directory, commit)
+    state = subprocess.run(["gh", "release", "view", tag, "--json", "isDraft"], capture_output=True, text=True, cwd=ROOT)
+    if state.returncode == 0:
+        if not json.loads(state.stdout)["isDraft"]:
+            raise RuntimeError("Refusing to replace a published release")
+    elif "release not found" not in state.stderr.lower():
+        raise RuntimeError(state.stderr.strip() or "Cannot inspect GitHub release")
+    notes = (f"Kwi for macOS — Apple Silicon\n\nSource: {commit}\n\n"
+             "Extract Kwi.app from Kwi-arm64.zip and copy it to Applications.\n"
+             "Ad-hoc signed; Developer ID signing and notarization are not configured.\n"
+             "Headless CI tests and package audits pass. GUI/Metal checks remain local.\n"
+             "Dependency notices are bundled in the app. Kwi-sources.tar.gz contains matching application, dependency and build recipe sources.\n"
+             "SOURCES.json lists versions and hashes. Verify downloads with SHA256SUMS.\n"
+             "Review this draft before publication.\n")
+    with tempfile.TemporaryDirectory(prefix="kwi-release-notes-") as temporary:
+        note_file = Path(temporary) / "notes.txt"
+        note_file.write_text(notes)
+        flags = ["--draft", "--prerelease=" + str("-" in tag).lower(), "--notes-file", str(note_file)]
+        assets = [str(directory / name) for name in (*ASSET_FILES, "SHA256SUMS")]
+        if state.returncode == 0:
+            subprocess.run(["gh", "release", "upload", tag, *assets, "--clobber"], check=True, cwd=ROOT)
+            subprocess.run(["gh", "release", "edit", tag, *flags], check=True, cwd=ROOT)
+        else:
+            subprocess.run(["gh", "release", "create", tag, *assets, "--verify-tag", "--title", f"Kwi for macOS {tag}", *flags], check=True, cwd=ROOT)
+
+
+def build(args):
     destination = args.output.absolute()
     check_output(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -126,5 +226,32 @@ def main():
     print(f"Verified package: {destination}", flush=True)
 
 
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", nargs="?", default="build", choices=("build", "assets", "verify", "validate-tag", "draft"))
+    parser.add_argument("--prefix", type=Path, default=ROOT / "build-macos/craft-root")
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--package-dir", type=Path, default=ROOT / "build-macos/package")
+    parser.add_argument("--dependencies", type=Path, default=ROOT / "build-macos/dependencies.json")
+    parser.add_argument("--tag", default=os.environ.get("RELEASE_TAG") or os.environ.get("TAG", ""))
+    parser.add_argument("--commit", default=os.environ.get("EXPECTED_COMMIT") or None)
+    args = parser.parse_args()
+    args.output = (args.output or ROOT / "build-macos" / ("package" if args.action == "build" else "release-assets")).absolute()
+    if args.action == "build":
+        build(args)
+    elif args.action == "assets":
+        assemble_assets(args.package_dir.resolve(), args.dependencies.resolve(), args.output)
+    elif args.action == "verify":
+        print(f"Verified release assets for {verify_assets(args.output, args.commit)}")
+    elif args.action == "validate-tag":
+        print(f"Validated {args.tag}: {validate_tag(args.tag)}")
+    elif args.action == "draft":
+        draft_release(args.tag, args.output)
+
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (RuntimeError, subprocess.CalledProcessError) as error:
+        print(error, file=sys.stderr)
+        sys.exit(1)

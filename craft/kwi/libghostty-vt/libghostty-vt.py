@@ -42,7 +42,8 @@ class Package(PackageBase, MultiSource, BuildSystemBase, TypePackager):
         command = [sys.executable, str(root / "scripts/macos/ghostty.py"),
                    "--source", str(self.sourceDir()), "--zig", str(prefix / "dev-utils/zig/zig"),
                    "--prefix", str(self.buildDir() / "zig-out"),
-                   "--cache", str(prefix / "download/archives/kwi/libghostty-vt/packages")]
+                   "--cache", str(prefix / "download/archives/kwi/libghostty-vt/packages"),
+                   "--jobs", str(CraftCore.settings.get("Compile", "Jobs", "4"))]
         log = prefix / "logs/kwi/libghostty-vt/native-build.log"
         log.parent.mkdir(parents=True, exist_ok=True)
         with log.open("w") as stream:

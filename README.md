@@ -39,34 +39,38 @@ Option-as-Alt is available under **Behavior**.
 ## Build
 
 Use an Apple Silicon Mac with full Xcode, Git and Python 3.11 or later. Dependency
-versions are pinned in the build scripts; Craft manages a project-local prefix.
+versions are pinned; Craft manages a project-local prefix. The root Makefile is
+the entry point for local development and CI.
 
 ```sh
-export DEVELOPER_DIR="$(xcode-select -p)"
-python3 scripts/macos/craft.py prepare
-python3 scripts/macos/craft.py run --install-deps kwi/kwi
-python3 scripts/macos/craft.py run --configure kwi/kwi
-python3 scripts/macos/craft.py run --make --install --post-install --qmerge --post-qmerge kwi/kwi
-python3 scripts/macos/package.py --output build-macos/package
-open build-macos/package/Kwi.app
+make build
+make test
+make run
 ```
 
-`DEVELOPER_DIR` must point to full Xcode, not Command Line Tools. Run tooling tests
-with `python3 -m unittest discover -s tests/macos -v`. Native tests use CTest in
-`build-macos/craft-root/build/kwi/kwi/work/build`; `-LE gui` selects headless checks.
-For GUI checks, first run `python3 scripts/macos/workloads.py` and keep the test
-windows focused in a logged-in Mac session.
-Commit local changes before packaging so the source archive matches the build.
+Make uses the Xcode selected by `xcode-select`; set `DEVELOPER_DIR` to a full Xcode
+`Contents/Developer` directory if Command Line Tools is selected. `make help`
+lists all commands. Use `JOBS=2` to limit compiler parallelism and `ARGS='…'` to
+pass options to test or measurement tools. `make test-gui` needs a focused,
+logged-in Mac session; performance and app campaigns are explicit targets.
+
+`make ci` runs checks, builds, headless tests and verified release packaging.
+`make package` produces the app and matching sources; commit local changes first
+so the source archive matches the build. Python helpers in `scripts/macos/`
+implement deployment and verification behind the Makefile.
 
 ## Development
 
 This is an independent macOS port. KDE's original Git history is retained, and
 [upstream tracking](https://github.com/MohamedElashri/kwi-mac/actions/workflows/upstream.yml)
-reports new changes weekly. Fetch KDE's `master` through an `upstream` remote,
-merge updates on a review branch, and build/test before merging into `main`.
+reports new changes weekly through `make upstream`. Fetch KDE's `master` through
+an `upstream` remote, merge updates on a review branch, and build/test before
+merging into `main`.
 
-Version tags start the [release workflow](https://github.com/MohamedElashri/kwi-mac/actions/workflows/release.yml),
-which tests and packages arm64 builds and prepares a draft for publication.
+The [CI workflow](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml)
+uses `make check` and `make ci` on pushes and pull requests. Version tags also run
+`make release` to verify assets and prepare a draft for publication. Locally,
+check out the tag, run `make ci`, then `make release TAG=<tag>`.
 Downloads include checksums, dependency metadata and source information.
 
 ## License

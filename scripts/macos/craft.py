@@ -38,7 +38,9 @@ def checkout(url, revision, destination, source=None):
         run(["git", "-C", destination, "checkout", "--detach", revision])
 
 
-def prepare(prefix, craft_source=None, blueprints_source=None):
+def prepare(prefix, craft_source=None, blueprints_source=None, jobs=4):
+    if jobs < 1:
+        raise RuntimeError("Build jobs must be positive")
     marker = prefix / "etc/kwi-bootstrap.json"
     if prefix.exists() and any(prefix.iterdir()) and not marker.exists():
         raise RuntimeError(f"Refusing to reuse a prefix not owned by this bootstrap: {prefix}")
@@ -104,6 +106,10 @@ def prepare(prefix, craft_source=None, blueprints_source=None):
     settings = configparser.ConfigParser(interpolation=None)
     settings.optionxform = str
     settings.read(config)
+    if settings["Compile"]["Jobs"] != str(jobs):
+        settings["Compile"]["Jobs"] = str(jobs)
+        with config.open("w") as stream:
+            settings.write(stream)
     if not settings.has_option("CraftDebug", "LogDir"):
         settings["CraftDebug"]["LogDir"] = str(prefix / "logs")
         with config.open("w") as stream:
@@ -148,6 +154,7 @@ def main():
     parser.add_argument("--developer-dir", default=os.environ.get("DEVELOPER_DIR"))
     parser.add_argument("--craft-source", help="Optional local clone at the pinned revision")
     parser.add_argument("--blueprints-source", help="Optional local blueprint clone")
+    parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("action", choices=["prepare", "run"])
     parser.add_argument("args", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -155,7 +162,7 @@ def main():
         parser.error("This prefix requires native Apple Silicon macOS")
     prefix = args.prefix.resolve()
     if args.action == "prepare":
-        prepare(prefix, args.craft_source, args.blueprints_source)
+        prepare(prefix, args.craft_source, args.blueprints_source, args.jobs)
         return 0
     if not args.developer_dir or not (Path(args.developer_dir) / "usr/bin/xcodebuild").exists():
         parser.error("Set --developer-dir or DEVELOPER_DIR to a full Xcode Contents/Developer directory")

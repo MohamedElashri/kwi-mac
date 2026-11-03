@@ -69,7 +69,7 @@ def main():
                 problems.append(name + ": requires macOS " + version)
     root = Path(__file__).resolve().parents[2]
     local_inputs = [*root.glob("scripts/macos/*.py"), *root.glob("craft/**/*.py"), *root.glob("craft/*.json"),
-                    root / ".github/workflows/macos-arm64.yml"]
+                    root / "Makefile", *root.glob(".github/workflows/*.yml")]
     result = {
         "status": "installed dependency snapshot; not a runtime or minimum-OS test",
         "source_commit": command(["git", "rev-parse", "HEAD"]),

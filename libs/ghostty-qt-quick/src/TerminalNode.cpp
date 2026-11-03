@@ -511,6 +511,7 @@ public:
         QSGTransformNode *background{nullptr};
         QSGTransformNode *foreground{nullptr};
         QVector<Cell> cells;
+        BidiRow bidi;
         QRegion searchMatches;
         QRegion hoveredLink;
         std::array<quint64, 2> identity{};
@@ -573,7 +574,7 @@ public:
 
     int cursorColumn(int row) const
     {
-        if (!options.preedit.isEmpty() || frame.cursor.y() != row || !frame.cursorVisible
+        if ((!options.composedPreedit && !options.preedit.isEmpty()) || frame.cursor.y() != row || !frame.cursorVisible
             || (frame.cursorBlinking && options.focused && !options.cursorBlinkVisible) || frame.cursor.x() < 0 || frame.cursor.x() >= frame.rows[row].size()) {
             return -1;
         }
@@ -594,12 +595,14 @@ public:
                      int columnCount,
                      const QVector<Cell> &cells,
                      int rowCursorColumn,
-                     bool pixelAligned = true)
+                     bool pixelAligned = true,
+                     const QRectF &sourceRect = {})
     {
         if (!image.page || rect.isEmpty()) {
             return;
         }
 
+        const QRectF coverage = sourceRect.isEmpty() ? QRectF(QPointF(), image.pixels.size()) : sourceRect;
         const qreal cw{metrics.cellSize.width()};
         const int lastColumn{qMin(int(cells.size()) - 1, firstColumn + columnCount - 1)};
         qreal left{rect.left()};
@@ -616,10 +619,10 @@ public:
 
             if (!(cell.flags & Invisible) && (!(cell.flags & Blink) || options.textBlinkVisible)) {
                 const QRectF part(left, rect.y(), right - left, rect.height());
-                const QRectF source((part.x() - rect.x()) * image.pixels.width() / rect.width(),
-                                    0,
-                                    part.width() * image.pixels.width() / rect.width(),
-                                    image.pixels.height());
+                const QRectF source(coverage.x() + (part.x() - rect.x()) * coverage.width() / rect.width(),
+                                    coverage.y(),
+                                    part.width() * coverage.width() / rect.width(),
+                                    coverage.height());
                 geometry.append(image,
                                 part,
                                 source,
@@ -711,7 +714,7 @@ public:
         }
     }
 
-    void rebuildRow(Row &row, const QVector<Cell> &sourceCells, int rowCursorColumn)
+    void rebuildRow(Row &row, const QVector<Cell> &sourceCells, int rowCursorColumn, const BidiRow &bidi = {})
     {
         auto highlightedCells = sourceCells;
 
@@ -808,6 +811,11 @@ public:
                 continue;
             }
 
+            if (!bidi.logicalCells.isEmpty() && !isFontIcon(cell.text)) {
+                begin += cell.width;
+                continue;
+            }
+
             int end{begin + cell.width};
 
             const bool icon{isFontIcon(cell.text)};
@@ -858,12 +866,55 @@ public:
             begin = end;
         }
 
+        if (!bidi.logicalCells.isEmpty()) {
+            bool missed = false;
+            QElapsedTimer stage;
+            if (statistics)
+                stage.start();
+            const auto run = shaper.shapeBidi(bidi, statistics ? &missed : nullptr);
+            if (statistics) {
+                statistics->shapedRuns += missed;
+                statistics->shapingNanoseconds += stage.nsecsElapsed();
+                stage.restart();
+            }
+            for (const auto &glyph : run) {
+                const auto image = atlas->glyph(glyph.font, glyph.index, false);
+                const QRectF ink(glyph.baseline + image.bearing, image.pixels.size());
+                for (int index = 0; index < glyph.spans.size(); ++index) {
+                    const auto &span = glyph.spans[index];
+                    if (span.sourceRight <= span.sourceLeft)
+                        continue;
+                    const qreal left = index == 0 ? ink.left() : qMax(ink.left(), span.sourceLeft);
+                    const qreal right = index + 1 == glyph.spans.size() ? ink.right() : qMin(ink.right(), span.sourceRight);
+                    if (right <= left)
+                        continue;
+                    const qreal fit = span.columnCount * cw / (span.sourceRight - span.sourceLeft);
+                    const QRectF target(span.firstColumn * cw + (left - span.sourceLeft) * fit,
+                                        ink.y() / options.devicePixelRatio,
+                                        (right - left) * fit,
+                                        ink.height() / options.devicePixelRatio);
+                    appendGlyph(glyphs,
+                                image,
+                                target,
+                                span.firstColumn,
+                                span.columnCount,
+                                cells,
+                                rowCursorColumn,
+                                false,
+                                QRectF(left - ink.left(), 0, right - left, ink.height()));
+                }
+            }
+            if (statistics)
+                statistics->glyphBuildNanoseconds += stage.nsecsElapsed();
+        }
+
         // Underlines z-sort below, strikethrough sorts above.
         colorGeometry(row.foreground, decorations, statistics ? &*statistics : nullptr);
         decorationSprites.finish(row.foreground, statistics ? &*statistics : nullptr);
         glyphs.finish(row.foreground, statistics ? &*statistics : nullptr);
         colorGeometry(row.foreground, strikes, statistics ? &*statistics : nullptr);
         row.cells = sourceCells;
+        row.bidi = bidi;
         row.cursorColumn = rowCursorColumn;
 
         if (statistics) {
@@ -985,7 +1036,7 @@ public:
             overlay.foreground->setMatrix(matrix);
             cursorClip->appendChildNode(overlay.background);
             cursorClip->appendChildNode(overlay.foreground);
-            rebuildRow(overlay, frame.rows[frame.cursor.y()], column);
+            rebuildRow(overlay, frame.rows[frame.cursor.y()], column, options.bidiRows.value(frame.cursor.y()));
         }
 
         colorGeometry(cursor, quads, statistics ? &*statistics : nullptr);
@@ -995,7 +1046,7 @@ public:
     {
         clearChildren(preedit);
 
-        if (options.preedit.isEmpty()) {
+        if (options.composedPreedit || options.preedit.isEmpty()) {
             return;
         }
 
@@ -1069,7 +1120,9 @@ void TerminalNode::prepare(const Frame &frame, const Options &options)
     const bool appearanceChanged = fontChanged || terminalChanged || frame.foreground != d->frame.foreground || frame.background != d->frame.background
         || frame.cursorColor != d->frame.cursorColor || frame.selectionForeground != d->frame.selectionForeground
         || frame.selectionBackground != d->frame.selectionBackground || options.backgroundOpacity != d->options.backgroundOpacity
-        || options.searchForeground != d->options.searchForeground || options.searchBackground != d->options.searchBackground;
+        || options.searchForeground != d->options.searchForeground || options.searchBackground != d->options.searchBackground
+        || options.composedPreedit != d->options.composedPreedit
+        || (options.composedPreedit && (options.preedit != d->options.preedit || options.preeditAttributes != d->options.preeditAttributes));
     const bool cursorChanged = frame.cursor != d->frame.cursor || frame.cursorStyle != d->frame.cursorStyle || frame.cursorVisible != d->frame.cursorVisible
         || frame.cursorBlinking != d->frame.cursorBlinking || frame.cursorWideTail != d->frame.cursorWideTail || options.focused != d->options.focused
         || options.cursorBlinkVisible != d->options.cursorBlinkVisible || options.preedit.isEmpty() != d->options.preedit.isEmpty();
@@ -1226,11 +1279,12 @@ void TerminalNode::prepare(const Frame &frame, const Options &options)
         const QRegion matches{options.searchMatches.intersected(QRect(0, y, int(frame.rows[y].size()), 1)).translated(0, -y)};
         const QRegion link{options.hoveredLink.intersected(QRect(0, y, int(frame.rows[y].size()), 1)).translated(0, -y)};
 
-        if (appearanceChanged || cursorRowChanged || (blinkChanged && row.blink) || row.searchMatches != matches || row.hoveredLink != link
+        const auto bidi = options.bidiRows.value(y);
+        if (row.bidi != bidi || appearanceChanged || cursorRowChanged || (blinkChanged && row.blink) || row.searchMatches != matches || row.hoveredLink != link
             || ((version != row.version || row.cells.isEmpty()) && row.cells != frame.rows[y])) {
             row.searchMatches = matches;
             row.hoveredLink = link;
-            d->rebuildRow(row, frame.rows[y], cursorColumn);
+            d->rebuildRow(row, frame.rows[y], cursorColumn, bidi);
             cursorContentChanged |= y == frame.cursor.y();
         }
 
@@ -1271,7 +1325,7 @@ void TerminalNode::prepare(const Frame &frame, const Options &options)
         d->atlas->beginFrame();
 
         for (int y{0}; y < d->rows.size(); ++y) {
-            d->rebuildRow(d->rows[y], frame.rows[y], d->cursorColumn(y));
+            d->rebuildRow(d->rows[y], frame.rows[y], d->cursorColumn(y), options.bidiRows.value(y));
         }
 
         d->rebuildCursor();

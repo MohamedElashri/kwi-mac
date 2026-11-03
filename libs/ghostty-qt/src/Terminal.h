@@ -158,6 +158,8 @@ public:
     void scrollPrompt(int delta);
 
     bool select(QPoint first, QPoint last, bool rectangle = false);
+    bool
+    selectCells(const QRegion &cells, qint64 firstScreenRow = -1, qint64 lastScreenRow = -1); // Discontiguous logical cells, for visual rectangular selection.
     bool selectionGesture(const SelectionEvent &event);
     [[nodiscard]] bool selectionAutoscroll() const;
     void cancelSelectionGesture();

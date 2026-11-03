@@ -12,6 +12,11 @@ target_link_libraries(test-terminal-protocol PRIVATE ghostty-qt Ghostty::Vt Qt6:
 add_test(NAME terminal-protocol COMMAND test-terminal-protocol)
 set_tests_properties(terminal-protocol PROPERTIES TIMEOUT 30)
 
+add_executable(test-terminal-bidi TerminalBidiTest.cpp)
+target_link_libraries(test-terminal-bidi PRIVATE ghostty-qt-quick Qt6::Test)
+add_test(NAME terminal-bidi COMMAND test-terminal-bidi)
+set_tests_properties(terminal-bidi PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
+
 if(APPLE)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     enable_language(OBJCXX)

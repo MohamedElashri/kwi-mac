@@ -31,6 +31,59 @@ class TerminalProtocolTest : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void directionControlRoundTrips_data()
+    {
+        QTest::addColumn<QString>("text");
+        QTest::newRow("leading-isolate") << QStringLiteral("\u2067العربية 123\u2069");
+        QTest::newRow("leading-mark") << QStringLiteral("\u200f(שלום) 123");
+        QTest::newRow("embedding-on-space") << QStringLiteral("a \u202bשלום 123\u202c z");
+        QTest::newRow("closing-control-on-space") << QStringLiteral("a \u2067مرحبا \u2069");
+    }
+
+    void directionControlRoundTrips()
+    {
+        QFETCH(QString, text);
+        GhosttyQt::Terminal terminal{80, 4};
+        const auto bytes = text.toUtf8();
+        for (const char byte : bytes)
+            QVERIFY(terminal.feed(QByteArrayView(&byte, 1)));
+        GhosttyQt::Frame frame;
+        QVERIFY(terminal.snapshot(frame));
+        QCOMPARE(visible(frame).section(u'\n', 0, 0), text);
+        QVERIFY(terminal.select({0, 0}, {79, 0}));
+        QCOMPARE(terminal.selectionText(), text);
+        QVERIFY(terminal.selectAll());
+        QCOMPARE(terminal.selectionText(), text);
+        QVERIFY(terminal.resize(10, 6));
+        QVERIFY(terminal.selectAll());
+        QCOMPARE(terminal.selectionText(), text);
+    }
+
+    void directionControlsAndGraphemeWidths()
+    {
+        GhosttyQt::Terminal terminal;
+        terminal.resize(20, 4);
+        const QString sample = QStringLiteral("\u2067\u200f❤️\u2069 A");
+        terminal.feed(sample.toUtf8());
+        GhosttyQt::Frame frame;
+        QVERIFY(terminal.snapshot(frame));
+        QCOMPARE(visible(frame).section(u'\n', 0, 0), sample);
+        QCOMPARE(frame.rows[0][0].width, quint8(2));
+        QCOMPARE(frame.rows[0][1].width, quint8(0));
+        terminal.selectAll();
+        QCOMPARE(terminal.selectionText(), sample);
+        terminal.feed("\033c");
+        terminal.feed(QStringLiteral("\u2067").toUtf8());
+        terminal.feed("\r\nhello");
+        terminal.selectAll();
+        QCOMPARE(terminal.selectionText().trimmed(), QStringLiteral("hello"));
+        terminal.feed("\033c");
+        terminal.feed(QStringLiteral("\u2067").toUtf8());
+        terminal.feed("\033cOK");
+        terminal.selectAll();
+        QCOMPARE(terminal.selectionText(), QStringLiteral("OK"));
+    }
+
     void synchronizedOutputReleaseAndTimeout()
     {
         GhosttyQt::Terminal terminal{40, 6};

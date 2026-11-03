@@ -22,6 +22,7 @@ TerminalComponents.Terminal {
     view.cursorStyle: settings ? settings.cursorStyle : "block"
     view.cursorBlinking: settings ? settings.cursorBlinking : false
     view.confirmMultilinePaste: settings ? settings.confirmMultilinePaste : true
+    view.bidirectionalText: settings ? settings.bidirectionalText : true
     view.optionAsAlt: settings ? settings.optionAsAlt : false
     view.copyOnSelect: settings ? settings.copyOnSelect : false
     view.requireCtrlForLinks: settings ? settings.requireCtrlForLinks : true

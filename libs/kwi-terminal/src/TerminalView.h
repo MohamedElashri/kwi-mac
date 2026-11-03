@@ -5,6 +5,7 @@
 
 #include "Session.h"
 #include "kwiterminal_export.h"
+#include <BidiLayout.h>
 #include <QColor>
 #include <QFont>
 #include <QInputMethodEvent>
@@ -50,6 +51,7 @@ class KWI_TERMINAL_EXPORT TerminalView : public QQuickItem
     Q_PROPERTY(bool copyOnSelect MEMBER m_copyOnSelect NOTIFY copyOnSelectChanged)
     Q_PROPERTY(bool requireCtrlForLinks READ requireCtrlForLinks WRITE setRequireCtrlForLinks NOTIFY requireCtrlForLinksChanged)
 
+    Q_PROPERTY(bool bidirectionalText READ bidirectionalText WRITE setBidirectionalText NOTIFY bidirectionalTextChanged)
     Q_PROPERTY(bool optionAsAlt READ optionAsAlt WRITE setOptionAsAlt NOTIFY optionAsAltChanged)
 
     Q_PROPERTY(QString selectedText READ selectedText NOTIFY selectionChanged)
@@ -89,6 +91,9 @@ public:
     void setCursorBlinking(bool blinking);
     [[nodiscard]] bool requireCtrlForLinks() const;
     void setRequireCtrlForLinks(bool required);
+
+    [[nodiscard]] bool bidirectionalText() const;
+    void setBidirectionalText(bool enabled);
 
     [[nodiscard]] bool optionAsAlt() const;
     void setOptionAsAlt(bool enabled);
@@ -141,6 +146,7 @@ Q_SIGNALS:
     void copyOnSelectChanged();
     void requireCtrlForLinksChanged();
     void optionAsAltChanged();
+    void bidirectionalTextChanged();
     void selectionChanged();
     void searchStatusChanged();
     void scrollChanged();
@@ -216,6 +222,9 @@ private:
 
     QPointer<Session> m_session;
     GhosttyQt::Frame m_frame;
+    GhosttyQt::Quick::BidiLayout m_bidi;
+    bool m_bidirectionalText{true};
+    [[nodiscard]] QRectF logicalCellRectangle(QPoint cell) const;
     quint64 m_frameRevision{0};
     QFont m_font;
     QString m_fontFamily;
@@ -280,6 +289,9 @@ private:
     bool m_keyboardSelectionMode{false};
     bool m_traceMarkerSeen{false};
     QPoint m_keyboardCursor;
+    QPoint m_keyboardAnchor;
+    QPoint m_rectangleAnchor;
+    qint64 m_rectangleAnchorOffset{0};
     QPointF m_selectionPointer;
 };
 }

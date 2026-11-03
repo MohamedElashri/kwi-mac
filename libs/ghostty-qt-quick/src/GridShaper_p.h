@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "BidiLayout.h"
 #include "FontMetrics.h"
 
 #include <Frame.h>
@@ -17,6 +18,13 @@ namespace GhosttyQt::Quick
 {
 [[nodiscard]] bool isFontIcon(const QString &text);
 
+struct GlyphSpan {
+    qreal sourceLeft{0};
+    qreal sourceRight{0};
+    int firstColumn{0};
+    int columnCount{1};
+};
+
 struct PositionedGlyph {
     QRawFont font;
     quint32 index{0};
@@ -24,6 +32,7 @@ struct PositionedGlyph {
     qreal scale{1};
     int firstColumn{0};
     int columnCount{1};
+    QVector<GlyphSpan> spans{}; // Piecewise horizontal fit, shared by glyphs in a bidi run.
 };
 
 class GridShaper
@@ -31,6 +40,7 @@ class GridShaper
 public:
     void setMetrics(const FontMetrics &metrics, qreal devicePixelRatio);
     [[nodiscard]] QVector<PositionedGlyph> shape(const QVector<Cell> &cells, int begin, int end, bool *cacheMiss = nullptr);
+    [[nodiscard]] QVector<PositionedGlyph> shapeBidi(const BidiRow &row, bool *cacheMiss = nullptr);
     [[nodiscard]] int cacheSize() const;
 
 private:

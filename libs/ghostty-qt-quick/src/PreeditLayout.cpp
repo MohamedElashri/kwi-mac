@@ -85,6 +85,35 @@ Cell preeditCell(const Frame &frame, const QString &text, qsizetype start, qsize
 }
 }
 
+Frame frameWithPreedit(const Frame &frame, const PreeditLayout &preedit)
+{
+    Frame result = frame;
+    for (const auto &line : preedit.rows) {
+        if (line.cell.y() < 0 || line.cell.y() >= result.rows.size())
+            continue;
+        auto &cells = result.rows[line.cell.y()];
+        const int begin = line.cell.x();
+        const int end = qMin(int(cells.size()), begin + int(line.cells.size()));
+        if (begin > 0 && begin < cells.size() && cells[begin].width == 0) {
+            cells[begin - 1].text.clear();
+            cells[begin - 1].width = 1;
+        }
+        if (end < cells.size() && cells[end].width == 0) {
+            cells[end].width = 1;
+            cells[end].text.clear();
+        }
+        for (int x = qMax(0, begin); x < end; ++x)
+            cells[x] = line.cells[x - begin];
+    }
+    result.cursor = preedit.caret;
+    result.cursorVisible = preedit.caretVisible;
+    result.cursorWideTail = false;
+    result.cursorStyle = CursorStyle::Beam;
+    result.cursorColor = preedit.caretColor;
+    result.cursorBlinking = false;
+    return result;
+}
+
 PreeditLayout layoutPreedit(const Frame &frame, const QString &text, const QList<QInputMethodEvent::Attribute> &attributes)
 {
     PreeditLayout result;

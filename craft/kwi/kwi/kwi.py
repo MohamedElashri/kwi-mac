@@ -22,6 +22,7 @@ class subinfo(info.infoclass):
         self.runtimeDependencies["kde/unreleased/kirigami-addons"] = None
         self.runtimeDependencies["kde/libs/kirigami-app-components"] = None
         self.runtimeDependencies["kwi/libghostty-vt"] = None
+        self.runtimeDependencies["libs/icu"] = None
         self.runtimeDependencies["kde/frameworks/tier1/breeze-icons"] = None
         self.runtimeDependencies["kde/frameworks/tier3/kiconthemes"] = None
 

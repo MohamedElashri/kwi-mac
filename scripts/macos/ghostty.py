@@ -39,6 +39,20 @@ def fetch(source, cache):
     return path
 
 
+def apply_patches(source):
+    patches = sorted((ROOT / "craft/kwi/libghostty-vt").glob("*.patch"))
+    records = []
+    for patch in patches:
+        command = ["git", "apply", "--whitespace=error", str(patch)]
+        check = subprocess.run([*command[:2], "--check", *command[2:]], cwd=source, capture_output=True)
+        if check.returncode == 0:
+            subprocess.run(command, cwd=source, check=True)
+        else:
+            subprocess.run([*command[:2], "--reverse", "--check", *command[2:]], cwd=source, check=True)
+        records.append({"path": str(patch.relative_to(ROOT)), "sha256": hashlib.sha256(patch.read_bytes()).hexdigest()})
+    return records
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("source", "zig", "prefix", "cache"):
@@ -61,6 +75,7 @@ def main():
         else:
             shutil.copyfile(path, destination / Path(urllib.parse.urlparse(source["url"]).path).name)
         marker.touch()
+    patches = apply_patches(args.source)
     env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(args.cache / "zig-global-cache"))
     sdk = subprocess.check_output(["xcrun", "--show-sdk-path"], env=env, text=True).strip()
     # Craft supplies GNU libtool for autotools; Ghostty's Darwin archive step
@@ -93,7 +108,7 @@ def main():
                     target.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(path, target / path.name)
     (args.prefix / "share/kwi").mkdir(parents=True, exist_ok=True)
-    (args.prefix / "share/kwi/ghostty-build-inputs.json").write_text(json.dumps({"sources": manifest, "command": command, "sdk": sdk}, indent=2) + "\n")
+    (args.prefix / "share/kwi/ghostty-build-inputs.json").write_text(json.dumps({"sources": manifest, "patches": patches, "command": command, "sdk": sdk}, indent=2) + "\n")
 
 
 if __name__ == "__main__":

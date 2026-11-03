@@ -1,0 +1,4 @@
+# SPDX-FileCopyrightText: none
+# SPDX-License-Identifier: CC0-1.0
+# Unified patches use a single space for empty context lines.
+craft/kwi/libghostty-vt/*.patch whitespace=-blank-at-eol

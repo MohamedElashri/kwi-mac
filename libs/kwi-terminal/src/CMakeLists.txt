@@ -42,7 +42,7 @@ target_include_directories(kwi-terminal PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
 # Private C++ headers use ghostty-qt types. Its implementation is linked here.
 target_link_libraries(kwi-terminal
-    PUBLIC Qt6::Core Qt6::Gui Qt6::Quick $<COMPILE_ONLY:ghostty-qt>
+    PUBLIC Qt6::Core Qt6::Gui Qt6::Quick $<COMPILE_ONLY:ghostty-qt> $<COMPILE_ONLY:ghostty-qt-quick>
     PRIVATE ghostty-qt ghostty-qt-quick Qt6::Concurrent Qt6::DBus Qt6::Network Qt6::QuickControls2
         KF6::CoreAddons KF6::Pty KF6::ConfigGui KF6::GuiAddons KF6::I18n KF6::I18nQml
         KF6::Kirigami)

@@ -31,4 +31,5 @@ struct KWI_TERMINAL_EXPORT TerminalLaunch {
 };
 
 [[nodiscard]] KWI_TERMINAL_EXPORT QString systemShell(const QProcessEnvironment &environment = QProcessEnvironment::systemEnvironment());
+[[nodiscard]] bool interactiveShellArguments(const QStringList &arguments);
 }

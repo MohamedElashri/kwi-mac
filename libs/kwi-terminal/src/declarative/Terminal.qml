@@ -124,22 +124,4 @@ FocusScope {
             onWheel: event => terminal.scrollHistory(event.pixelDelta, event.angleDelta, event.modifiers)
         }
     }
-
-    Controls.Label {
-        anchors.left: terminal.left
-        anchors.bottom: terminal.bottom
-        width: Math.min(implicitWidth, terminal.width)
-        padding: Kirigami.Units.smallSpacing
-        visible: terminal.hoveredLink.toString().length > 0
-        text: terminal.hoveredLink.toString()
-        textFormat: Text.PlainText
-        elide: Text.ElideRight
-        Accessible.name: translations.i18nc("@info:accessibility", "Link: %1", text)
-
-        background: Rectangle {
-            color: Kirigami.Theme.backgroundColor
-            border.color: Kirigami.Theme.disabledTextColor
-            radius: Kirigami.Units.cornerRadius
-        }
-    }
 }

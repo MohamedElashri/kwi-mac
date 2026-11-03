@@ -4,7 +4,7 @@
 
 PATH=/usr/bin:/bin
 
-# Arguments: cmdline byte limit, session PID/start time, mode (shell/command/cleanup),
+# Arguments: cmdline byte limit, session PID/start time, mode (startup/shell/command/cleanup),
 # and the last observed SSH PID/start time/executable.
 command_line_limit=$1
 shift
@@ -55,10 +55,10 @@ fi
 directory=$(readlink -- "/proc/$target/cwd") || directory=$(readlink -- "/proc/$pid/cwd") || directory=
 foreground_executable=$(readlink -- "/proc/$target/exe") || foreground_executable=
 
-# Only an interactive shell in its own foreground group needs proof of idleness.
+# Startup observation also needs argv to distinguish the launcher from the command.
 read_arguments=0
 
-if [ "$mode" = shell ] && [ "$foreground" = "$pid" ]; then
+if [ "$mode" = startup ] || { [ "$mode" = shell ] && [ "$foreground" = "$pid" ]; }; then
     read_arguments=1
 fi
 

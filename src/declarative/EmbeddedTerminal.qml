@@ -35,6 +35,17 @@ FocusScope {
         anchors.fill: parent
         spacing: 0
 
+        TerminalSearchBar {
+            id: findBar
+
+            Layout.fillWidth: true
+            visible: root.findVisible
+            terminal: pane.terminal
+            tabBarAtTop: root.session && !root.session.settings.tabBarAtBottom
+
+            onCloseRequested: root.hideFind()
+        }
+
         Kirigami.InlineMessage {
             objectName: "embeddedErrorMessage"
             Layout.fillWidth: true
@@ -49,16 +60,6 @@ FocusScope {
             Layout.fillWidth: true
             Layout.fillHeight: true
             applicationSession: root.session
-        }
-
-        TerminalSearchBar {
-            id: findBar
-
-            Layout.fillWidth: true
-            visible: root.findVisible
-            terminal: pane.terminal
-
-            onCloseRequested: root.hideFind()
         }
     }
 }

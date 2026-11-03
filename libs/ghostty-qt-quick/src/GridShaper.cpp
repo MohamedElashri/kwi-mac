@@ -10,8 +10,10 @@
 #include <QTextCharFormat>
 #include <QTextLayout>
 #include <QTextOption>
+#include <QVarLengthArray>
 #include <algorithm>
 #include <array>
+#include <iterator>
 #include <utility>
 
 namespace GhosttyQt::Quick
@@ -114,6 +116,8 @@ QVector<PositionedGlyph> GridShaper::shape(const QVector<Cell> &cells, int begin
     }
 
     QTextLayout layout{text, font};
+    // Retain shaping data for the glyph and cursor queries below.
+    layout.setCacheEnabled(true);
     QTextOption option{Qt::AlignLeft};
     option.setWrapMode(QTextOption::NoWrap);
     option.setTextDirection(Qt::LeftToRight);
@@ -124,19 +128,7 @@ QVector<PositionedGlyph> GridShaper::shape(const QVector<Cell> &cells, int begin
     line.setLineWidth(1e9);
     layout.endLayout();
     const auto runs =
-        layout.glyphRuns(1, textEnd - 1, QTextLayout::RetrieveGlyphIndexes | QTextLayout::RetrieveGlyphPositions | QTextLayout::RetrieveStringIndexes);
-    QVector<int> boundaries{textEnd};
-
-    for (const auto &run : runs) {
-        const auto stringIndexes = run.stringIndexes();
-
-        for (const auto index : stringIndexes) {
-            boundaries += int(index);
-        }
-    }
-
-    std::sort(boundaries.begin(), boundaries.end());
-    boundaries.erase(std::unique(boundaries.begin(), boundaries.end()), boundaries.end());
+        line.glyphRuns(1, textEnd - 1, QTextLayout::RetrieveGlyphIndexes | QTextLayout::RetrieveGlyphPositions | QTextLayout::RetrieveStringIndexes);
     QVector<PositionedGlyph> shaped;
     const qreal cellWidth{m_metrics.cellSize.width() * m_dpr};
     const qreal cellHeight{m_metrics.cellSize.height() * m_dpr};
@@ -147,36 +139,116 @@ QVector<PositionedGlyph> GridShaper::shape(const QVector<Cell> &cells, int begin
         int columns{1};
     };
     QHash<int, FittedCluster> fittedClusters;
+    const auto appendGlyph = [&](const QRawFont &raw, quint32 index, QPointF position, int source, int next, bool fallback) {
+        const int firstColumn{columns[source]};
+        const int span{qMax(1, columns[next] - firstColumn)};
+        const qreal origin{line.cursorToX(source)};
+
+        if (fallback || iconColumns) {
+            fittedClusters.tryEmplace(firstColumn);
+        }
+
+        shaped.append(PositionedGlyph{raw,
+                                      index,
+                                      QPointF(firstColumn * cellWidth + position.x() - origin, baseline + position.y() - line.ascent()),
+                                      1,
+                                      firstColumn,
+                                      span});
+    };
+
+    QVector<int> boundaries{textEnd};
+    bool overlappingRuns{false};
+    int previousEnd{1};
 
     for (const auto &run : runs) {
-        const auto indexes = run.glyphIndexes();
-        const auto positions = run.positions();
         const auto sources = run.stringIndexes();
-        const QRawFont raw{run.rawFont()};
-        const bool fallback{raw.familyName() != primary.familyName()};
 
-        for (qsizetype i{0}; i < indexes.size(); ++i) {
-            const int source{int(sources[i])};
+        if (!sources.isEmpty()) {
+            const auto [first, last] = std::minmax_element(sources.cbegin(), sources.cend());
+            overlappingRuns |= *first < previousEnd;
+            previousEnd = int(*last) + 1;
+        }
 
-            if (source < 1 || source >= textEnd) {
-                continue;
+        std::transform(sources.cbegin(), sources.cend(), std::back_inserter(boundaries), [](qsizetype source) {
+            return int(source);
+        });
+    }
+
+    if (!overlappingRuns) {
+        std::sort(boundaries.begin(), boundaries.end());
+        boundaries.erase(std::unique(boundaries.begin(), boundaries.end()), boundaries.end());
+
+        for (const auto &run : runs) {
+            const auto indexes = run.glyphIndexes();
+            const auto positions = run.positions();
+            const auto sources = run.stringIndexes();
+            const QRawFont raw{run.rawFont()};
+            const bool fallback{raw.familyName() != primary.familyName()};
+
+            for (qsizetype i{0}; i < indexes.size(); ++i) {
+                const int source{int(sources[i])};
+
+                if (source >= 1 && source < textEnd) {
+                    appendGlyph(raw, indexes[i], positions[i], source, *std::upper_bound(boundaries.cbegin(), boundaries.cend(), source), fallback);
+                }
+            }
+        }
+
+    } else {
+        // A range query can return part of a ligature shared by adjacent cells.
+        // Reunite those fragments before fitting and coloring the glyph.
+        struct PartialLigature {
+            qsizetype glyph;
+            QPointF position;
+        };
+        QVarLengthArray<PartialLigature, 4> previousLigatures;
+
+        for (int source{1}; source < textEnd;) {
+            int next{source + 1};
+
+            while (next < textEnd && columns[next] == columns[source]) {
+                ++next;
             }
 
-            const int next{*std::upper_bound(boundaries.cbegin(), boundaries.cend(), source)};
-            const int firstColumn{columns[source]};
-            const int span{qMax(1, columns[next] - firstColumn)};
-            const qreal origin{line.cursorToX(source)};
+            QVarLengthArray<PartialLigature, 4> ligatures;
+            const auto cellRuns = line.glyphRuns(source, next - source, QTextLayout::RetrieveGlyphIndexes | QTextLayout::RetrieveGlyphPositions);
 
-            if (fallback || iconColumns) {
-                fittedClusters.tryEmplace(firstColumn);
+            for (const auto &run : cellRuns) {
+                const auto indexes = run.glyphIndexes();
+                const auto positions = run.positions();
+                const QRawFont raw{run.rawFont()};
+                const bool fallback{raw.familyName() != primary.familyName()};
+                const bool split{run.flags().testFlag(QGlyphRun::SplitLigature)};
+
+                for (qsizetype i{0}; i < indexes.size(); ++i) {
+                    qsizetype match{-1};
+
+                    if (split) {
+                        for (const auto &candidate : previousLigatures) {
+                            const auto &glyph = shaped[candidate.glyph];
+
+                            if (glyph.index == indexes[i] && glyph.font == raw && candidate.position == positions[i]) {
+                                match = candidate.glyph;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (match >= 0) {
+                        shaped[match].columnCount = columns[next] - shaped[match].firstColumn;
+                    } else {
+                        match = shaped.size();
+                        appendGlyph(raw, indexes[i], positions[i], source, next, fallback);
+                    }
+
+                    if (split) {
+                        ligatures.append({match, positions[i]});
+                    }
+                }
             }
 
-            shaped.append(PositionedGlyph{raw,
-                                          indexes[i],
-                                          QPointF(firstColumn * cellWidth + positions[i].x() - origin, baseline + positions[i].y() - line.ascent()),
-                                          1,
-                                          firstColumn,
-                                          span});
+            previousLigatures = std::move(ligatures);
+            source = next;
         }
     }
 
@@ -326,6 +398,7 @@ QVector<PositionedGlyph> GridShaper::shapeBidi(const BidiRow &row, bool *cacheMi
         segment.text += QChar(0x202c);
         segment.sources += -1;
         QTextLayout layout(segment.text, m_metrics.pixelFont);
+        layout.setCacheEnabled(true);
         const bool rtl = segment.level & 1;
         QTextOption option(Qt::AlignLeft);
         // Shape resolved runs independently. Matching the paragraph direction

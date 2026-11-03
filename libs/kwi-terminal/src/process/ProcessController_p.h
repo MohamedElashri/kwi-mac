@@ -7,7 +7,6 @@
 #include <QDBusUnixFileDescriptor>
 #include <QObject>
 #include <QString>
-#include <QStringList>
 #include <functional>
 
 class KPtyDevice;
@@ -52,6 +51,4 @@ protected:
 
     QDBusUnixFileDescriptor m_master;
 };
-
-[[nodiscard]] bool interactiveShellArguments(const QStringList &arguments);
 }

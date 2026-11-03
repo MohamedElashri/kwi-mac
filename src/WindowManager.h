@@ -11,9 +11,7 @@
 #include <QString>
 #include <QVariantMap>
 #include <QtQmlIntegration/qqmlintegration.h>
-#include <memory>
 
-class QEventLoopLocker;
 class QQuickWindow;
 
 Q_MOC_INCLUDE("SessionModel.h")
@@ -87,7 +85,6 @@ private:
     QString m_dragToken{};
     QPointer<SessionModel> m_dragSource{};
     QPointer<TerminalSession> m_draggedSession{};
-    std::unique_ptr<QEventLoopLocker> m_dragQuitLock;
     QPointer<SessionModel> m_dropDestination{};
     QPointer<TerminalSession> m_dropBeforeSession{};
     bool m_dropAtEnd{false};

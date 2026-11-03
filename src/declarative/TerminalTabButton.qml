@@ -18,13 +18,14 @@ Controls.TabButton {
 
     required property int index
     required property TerminalSession session
+    readonly property string sessionTitle: session ? session.title : ""
     property bool showStatusIcons: true
     property bool draggable: false
     property bool dragging: false
     property int tabPosition: Controls.TabBar.Header
     readonly property bool dragGestureActive: tabDrag.active
-    readonly property string monitoringDescription: session.monitorActivity && session.monitorSilence ? KI18n.i18nc("@info:tooltip", "Monitoring activity and silence") : session.monitorActivity ? KI18n.i18nc("@info:tooltip", "Monitoring activity") : session.monitorSilence ? KI18n.i18nc("@info:tooltip", "Monitoring silence") : ""
-    readonly property bool hasProgress: !session.finished && session.progressState !== Terminal.Session.None
+    readonly property string monitoringDescription: !session ? "" : session.monitorActivity && session.monitorSilence ? KI18n.i18nc("@info:tooltip", "Monitoring activity and silence") : session.monitorActivity ? KI18n.i18nc("@info:tooltip", "Monitoring activity") : session.monitorSilence ? KI18n.i18nc("@info:tooltip", "Monitoring silence") : ""
+    readonly property bool hasProgress: session && !session.finished && session.progressState !== Terminal.Session.None
     readonly property string progressDescription: {
         if (!hasProgress)
             return "";
@@ -46,7 +47,9 @@ Controls.TabButton {
     signal closeRequested
     signal contextRequested
     signal renameRequested
-    signal dragRequested(point hotSpot)
+    signal dragRequested(point hotSpot, point scenePosition)
+    signal dragMoved(point scenePosition)
+    signal dragReleased(bool accepted)
     signal navigationRequested(int key)
 
     objectName: "terminalTab" + index
@@ -63,7 +66,7 @@ Controls.TabButton {
     // Reserve progress space even when hidden to keep the tab height stable.
     implicitHeight: Math.max(implicitBackgroundHeight + topInset + bottomInset, implicitContentHeight + topPadding + bottomPadding, titleLabel.implicitHeight + 2 * (progress.height + progress.anchors.bottomMargin) + Kirigami.Units.smallSpacing)
     Accessible.role: Accessible.PageTab
-    Accessible.name: session.attention ? KI18n.i18nc("@info:accessibility", "%1, needs attention", session.title) : session.title
+    Accessible.name: session && session.attention ? KI18n.i18nc("@info:accessibility", "%1, needs attention", sessionTitle) : sessionTitle
     Accessible.description: progressDescription
     Accessible.selected: checked
 
@@ -124,7 +127,7 @@ Controls.TabButton {
             Layout.leftMargin: Kirigami.Units.smallSpacing * 2
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: Kirigami.Units.iconSizes.small
-            source: control.session.iconName
+            source: control.session ? control.session.iconName : "utilities-terminal"
         }
 
         Controls.Label {
@@ -133,7 +136,7 @@ Controls.TabButton {
             objectName: "terminalTabLabel" + control.index
             Layout.fillWidth: true
             Layout.leftMargin: control.showStatusIcons ? 0 : Kirigami.Units.smallSpacing * 2
-            text: control.session.title
+            text: control.sessionTitle
             font: control.font
             textFormat: Text.PlainText
             elide: Text.ElideRight
@@ -145,7 +148,7 @@ Controls.TabButton {
             objectName: "closeTerminalTab" + control.index
             Kirigami.MnemonicData.enabled: false
 
-            readonly property string closeLabel: KI18n.i18nc("@action:button", "Close %1", control.session.title)
+            readonly property string closeLabel: KI18n.i18nc("@action:button", "Close %1", control.sessionTitle)
 
             Layout.alignment: Qt.AlignVCenter
             Layout.rightMargin: Kirigami.Units.smallSpacing * 2
@@ -178,11 +181,11 @@ Controls.TabButton {
         visible: control.hasProgress
         from: 0
         to: 100
-        value: Math.max(0, control.session.progressPercent)
+        value: control.session ? Math.max(0, control.session.progressPercent) : 0
         indeterminate: control.hasProgress && (control.session.progressState === Terminal.Session.Indeterminate || (control.session.progressPercent < 0 && control.session.progressState !== Terminal.Session.Paused))
-        Accessible.name: control.session.title
+        Accessible.name: control.sessionTitle
         Accessible.description: control.progressDescription
-        palette.highlight: control.session.progressState === Terminal.Session.Error ? control.Kirigami.Theme.negativeTextColor : control.session.progressState === Terminal.Session.Paused ? control.Kirigami.Theme.neutralTextColor : control.Kirigami.Theme.highlightColor
+        palette.highlight: control.session && control.session.progressState === Terminal.Session.Error ? control.Kirigami.Theme.negativeTextColor : control.session && control.session.progressState === Terminal.Session.Paused ? control.Kirigami.Theme.neutralTextColor : control.Kirigami.Theme.highlightColor
 
         background: Rectangle {
             color: progress.palette.highlight
@@ -218,14 +221,26 @@ Controls.TabButton {
         id: tabDrag
 
         target: null
-        enabled: control.draggable
+        enabled: control.draggable && control.session !== null
         acceptedButtons: Qt.LeftButton
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
 
         onActiveChanged: {
             if (active && !closeButton.contains(closeButton.mapFromItem(control, centroid.pressPosition)))
-                control.dragRequested(centroid.pressPosition);
+                control.dragRequested(centroid.pressPosition, centroid.scenePosition);
         }
+
+        onCentroidChanged: {
+            if (active)
+                control.dragMoved(centroid.scenePosition);
+        }
+
+        onGrabChanged: transition => {
+            if (transition === PointerDevice.UngrabExclusive)
+                control.dragReleased(true);
+        }
+
+        onCanceled: control.dragReleased(false)
     }
 
     TapHandler {
@@ -248,7 +263,7 @@ Controls.TabButton {
 
     Controls.ToolTip {
         objectName: "terminalTabToolTip" + control.index
-        text: TextFormatting.plainTextToHtml(control.session.title + (control.progressDescription.length > 0 ? "\n" + control.progressDescription : "") + (control.monitoringDescription.length > 0 ? "\n" + control.monitoringDescription : ""))
+        text: TextFormatting.plainTextToHtml(control.sessionTitle + (control.progressDescription.length > 0 ? "\n" + control.progressDescription : "") + (control.monitoringDescription.length > 0 ? "\n" + control.monitoringDescription : ""))
         visible: control.hovered && !closeButton.hovered && (titleLabel.truncated || control.progressDescription.length > 0 || control.monitoringDescription.length > 0)
         delay: Kirigami.Units.toolTipDelay
     }

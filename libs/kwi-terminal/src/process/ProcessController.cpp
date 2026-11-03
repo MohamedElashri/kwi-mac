@@ -5,8 +5,6 @@
 
 #include <KLocalizedString>
 #include <KPtyDevice>
-#include <QStringView>
-#include <algorithm>
 #include <cerrno>
 #include <cstring>
 
@@ -40,22 +38,4 @@ void ProcessController::closeTransport()
     Q_EMIT transportClosed();
 }
 
-bool interactiveShellArguments(const QStringList &arguments)
-{
-    return std::ranges::all_of(arguments, [](const QString &argument) {
-        if (argument == QLatin1String("--login") || argument == QLatin1String("--interactive") || argument == QLatin1String("--noprofile")
-            || argument == QLatin1String("--norc") || argument == QLatin1String("--no-config") || argument == QLatin1String("--no-rcs")) {
-            return true;
-        }
-
-        // Commands and script filenames are active work even in the shell's group.
-        if (!argument.startsWith(QLatin1Char('-')) || argument.size() < 2) {
-            return false;
-        }
-
-        return std::ranges::all_of(QStringView(argument).mid(1), [](QChar flag) {
-            return flag == QLatin1Char('i') || flag == QLatin1Char('l');
-        });
-    });
-}
 }

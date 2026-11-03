@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "ProcessInfo_p.h"
 #include <QByteArray>
 #include <QString>
 #include <QtTypes>
@@ -10,6 +11,8 @@
 
 namespace Kwi::NativeProcessInfo
 {
+[[nodiscard]] ProcessInfo observe(int masterFd, qint64 leader, const QString &initialExecutable, bool interactiveShell, const ProcessInfo &previous);
+[[nodiscard]] pid_t processInGroup(pid_t group, pid_t session);
 [[nodiscard]] QString directory(pid_t pid);
 [[nodiscard]] QString executable(pid_t pid);
 /** Native NUL-separated argv, bounded by ProcessQueryLimits. */

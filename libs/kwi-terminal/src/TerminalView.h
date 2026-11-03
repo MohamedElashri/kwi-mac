@@ -58,6 +58,7 @@ class KWI_TERMINAL_EXPORT TerminalView : public QQuickItem
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
     Q_PROPERTY(QString searchStatus READ searchStatus NOTIFY searchStatusChanged)
     Q_PROPERTY(bool searchBusy READ isSearchBusy NOTIFY searchStatusChanged)
+    Q_PROPERTY(qsizetype searchMatchCount READ searchMatchCount NOTIFY searchStatusChanged)
 
     Q_PROPERTY(qreal scrollPosition READ scrollPosition NOTIFY scrollChanged)
     Q_PROPERTY(qreal scrollSize READ scrollSize NOTIFY scrollChanged)
@@ -102,6 +103,8 @@ public:
     [[nodiscard]] bool hasSelection() const;
     [[nodiscard]] QString searchStatus() const;
     [[nodiscard]] bool isSearchBusy() const;
+    // -1 when no search result is available.
+    [[nodiscard]] qsizetype searchMatchCount() const;
 
     [[nodiscard]] qreal scrollPosition() const;
     [[nodiscard]] qreal scrollSize() const;

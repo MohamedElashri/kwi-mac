@@ -7,7 +7,9 @@
 #include <KLocalizedString>
 #include <QAccessible>
 #include <QAccessibleObject>
+#include <QHash>
 #include <QKeySequence>
+#include <QList>
 #include <QPair>
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -15,8 +17,12 @@
 #include <QQuickRenderControl>
 #include <QQuickWindow>
 #include <QStringList>
+#include <QStringView>
 #include <QVector>
 #include <QWindow>
+#include <algorithm>
+#include <array>
+#include <utility>
 
 namespace Kwi
 {
@@ -193,6 +199,7 @@ public:
     struct Content {
         QString text;
         QVector<QPoint> cells;
+        QVector<int> rowOffsets;
         QPair<int, int> selection{-1, -1};
         QPoint end;
     };
@@ -216,6 +223,7 @@ public:
 
         const auto &frame = terminal->m_frame;
         const auto &rows = frame.rows;
+        result.rowOffsets.reserve(rows.size() + 1);
         const auto append = [&result](const QString &text, QPoint cell, bool selected) {
             const int start{int(result.text.size())};
             result.text += text;
@@ -232,6 +240,7 @@ public:
         };
 
         for (int y{0}; y < rows.size(); ++y) {
+            result.rowOffsets.append(result.text.size());
             const auto &row = rows[y];
             const bool wrapped{frame.rowWrapped.value(y)};
             qsizetype length{row.size()};
@@ -261,6 +270,8 @@ public:
                            && (rows[y + 1].first().flags & GhosttyQt::Selected));
             }
         }
+
+        result.rowOffsets.append(result.text.size());
 
         return result;
     }
@@ -538,41 +549,7 @@ public:
             return;
         }
 
-        const QString current{content().text};
-
-        if (current != m_previousText) {
-            int prefix{0};
-
-            while (prefix < current.size() && prefix < m_previousText.size() && current[prefix] == m_previousText[prefix]) {
-                ++prefix;
-            }
-
-            if (prefix > 0 && prefix < current.size() && current[prefix].isLowSurrogate() && current[prefix - 1].isHighSurrogate()) {
-                --prefix;
-            }
-
-            int suffix{0};
-
-            while (suffix < current.size() - prefix && suffix < m_previousText.size() - prefix
-                   && current[current.size() - suffix - 1] == m_previousText[m_previousText.size() - suffix - 1]) {
-                ++suffix;
-            }
-
-            const qsizetype suffixStart{current.size() - suffix};
-
-            if (suffixStart > 0 && suffixStart < current.size() && current[suffixStart].isLowSurrogate() && current[suffixStart - 1].isHighSurrogate()) {
-                --suffix;
-            }
-
-            const QString previous{m_previousText};
-            m_previousText = current;
-            QAccessibleTextUpdateEvent event(view(),
-                                             prefix,
-                                             previous.mid(prefix, previous.size() - prefix - suffix),
-                                             current.mid(prefix, current.size() - prefix - suffix));
-            event.setCursorPosition(cursorPosition());
-            QAccessible::updateAccessibility(&event);
-        }
+        updateText();
 
         const int cursor{cursorPosition()};
 
@@ -621,10 +598,127 @@ private:
     int m_reviewCursor{-1};
     quint64 m_reviewRevision{0};
 #endif
+    struct TextRow {
+        std::array<quint64, 2> identity;
+        int start;
+        int end;
+    };
+
+    void textChanged(QStringView previous, QStringView current, int position)
+    {
+        if (previous == current) {
+            return;
+        }
+
+        int prefix{0};
+
+        while (prefix < current.size() && prefix < previous.size() && current[prefix] == previous[prefix]) {
+            ++prefix;
+        }
+
+        if (prefix > 0 && prefix < current.size() && current[prefix].isLowSurrogate() && current[prefix - 1].isHighSurrogate()) {
+            --prefix;
+        }
+
+        int suffix{0};
+
+        while (suffix < current.size() - prefix && suffix < previous.size() - prefix
+               && current[current.size() - suffix - 1] == previous[previous.size() - suffix - 1]) {
+            ++suffix;
+        }
+
+        const qsizetype suffixStart{current.size() - suffix};
+
+        if (suffixStart > 0 && suffixStart < current.size() && current[suffixStart].isLowSurrogate() && current[suffixStart - 1].isHighSurrogate()) {
+            --suffix;
+        }
+
+        QAccessibleTextUpdateEvent event(view(),
+                                         position + prefix,
+                                         previous.sliced(prefix, previous.size() - prefix - suffix).toString(),
+                                         current.sliced(prefix, current.size() - prefix - suffix).toString());
+        event.setCursorPosition(cursorPosition());
+        QAccessible::updateAccessibility(&event);
+    }
+
+    void updateText()
+    {
+        const auto &current = content();
+        const auto &frame = view()->m_frame;
+        const QString previous{std::exchange(m_previousText, current.text)};
+        const auto previousRows = std::exchange(m_previousRows, {});
+        QHash<QPair<quint64, quint64>, int> identities;
+        QHash<QStringView, QList<int>> texts;
+
+        if (std::exchange(m_previousTerminalId, frame.terminalId) == frame.terminalId) {
+            identities.reserve(previousRows.size());
+            texts.reserve(previousRows.size());
+
+            for (int row{0}; row < previousRows.size(); ++row) {
+                const auto &entry = previousRows.at(row);
+                identities.insert({entry.identity[0], entry.identity[1]}, row);
+                texts[QStringView(previous).sliced(entry.start, entry.end - entry.start)].append(row);
+            }
+        }
+
+        m_previousRows.reserve(frame.rowIdentities.size());
+
+        for (int row{0}; row < frame.rowIdentities.size(); ++row) {
+            const auto &id = frame.rowIdentities.at(row);
+            const bool newline{!frame.rowWrapped.at(row) && row + 1 < frame.rows.size()};
+            // A row gains or loses its separator when it reaches the viewport edge.
+            m_previousRows.append({id, current.rowOffsets.at(row), current.rowOffsets.at(row + 1) - int(newline)});
+        }
+
+        int previousRow{0};
+        int previousEnd{0};
+        int currentEnd{0};
+
+        // Surviving rows delimit edits so scrolling does not announce them as new output.
+        for (const auto &row : std::as_const(m_previousRows)) {
+            const QStringView rowText{QStringView(current.text).sliced(row.start, row.end - row.start)};
+            int match{identities.value({row.identity[0], row.identity[1]}, -1)};
+
+            if (match < 0) {
+                // Ghostty replaces row identities when scrolling a region in place.
+                const auto candidates = texts.constFind(rowText);
+
+                if (candidates != texts.cend()) {
+                    const auto found = std::lower_bound(candidates->cbegin(), candidates->cend(), previousRow);
+
+                    if (found != candidates->cend()) {
+                        match = *found;
+                    }
+                }
+            }
+
+            if (match < previousRow) {
+                continue;
+            }
+
+            const auto &old = previousRows.at(match);
+
+            if (QStringView(previous).sliced(old.start, old.end - old.start) != rowText) {
+                continue;
+            }
+
+            textChanged(QStringView(previous).sliced(previousEnd, old.start - previousEnd),
+                        QStringView(current.text).sliced(currentEnd, row.start - currentEnd),
+                        currentEnd);
+            previousRow = match + 1;
+            previousEnd = old.end;
+            currentEnd = row.end;
+        }
+
+        textChanged(QStringView(previous).sliced(previousEnd), QStringView(current.text).sliced(currentEnd), currentEnd);
+    }
+
     mutable Content m_content;
     mutable quint64 m_contentRevision{0};
     mutable bool m_contentValid{false};
     QString m_previousText;
+    QVector<TextRow> m_previousRows;
+    quint64 m_previousTerminalId{0};
     QString m_previousName;
     int m_previousCursor{-1};
     QPair<int, int> m_previousSelection{-1, -1};
@@ -651,6 +745,11 @@ void TerminalView::installAccessibility()
 void TerminalView::updateAccessibility()
 {
     if (!QAccessible::isActive()) {
+        return;
+    }
+
+    // Do not emit accessibility updates while the QML scene is being torn down.
+    if (const auto *context = qmlContext(this); context && !context->isValid()) {
         return;
     }
 

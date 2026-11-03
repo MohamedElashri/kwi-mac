@@ -21,6 +21,7 @@ Keywords[ko]=터미널;셸;콘솔;명령;명령행;
 StartupNotify=true
 StartupWMClass=@KWI_EXECUTABLE@
 X-KDE-AuthorizeAction=shell_access
+X-KDE-Shortcuts=Ctrl+Alt+T
 Actions=NewWindow;NewTab;
 
 [Desktop Action NewWindow]

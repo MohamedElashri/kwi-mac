@@ -46,6 +46,4 @@ private:
     bool m_interactiveShell{false};
     bool m_closing{false};
 };
-
-[[nodiscard]] std::unique_ptr<ProcessController> attachedProcess();
 }

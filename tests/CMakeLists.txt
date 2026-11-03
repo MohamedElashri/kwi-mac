@@ -86,13 +86,15 @@ if(UNIX)
     set(process_source "${PROJECT_SOURCE_DIR}/libs/kwi-terminal/src")
     add_executable(test-native-process NativeProcessTest.cpp
         "${process_source}/ProcessLaunch.cpp"
+        "${process_source}/process/AttachedProcess.cpp"
+        "${process_source}/process/ProcessScope.cpp"
         "${process_source}/process/NativeProcess.cpp"
         "${process_source}/process/NativeProcess_p.h"
         "${process_source}/process/NativeProcessInfo.cpp"
         "${process_source}/process/ProcessController.cpp"
         "${process_source}/process/ProcessController_p.h")
     target_include_directories(test-native-process PRIVATE "${process_source}" "${PROJECT_BINARY_DIR}/libs/kwi-terminal/src")
-    target_link_libraries(test-native-process PRIVATE Qt6::Test Qt6::Concurrent Qt6::DBus KF6::Pty KF6::CoreAddons KF6::I18n)
+    target_link_libraries(test-native-process PRIVATE Qt6::Test Qt6::Gui Qt6::Concurrent Qt6::DBus KF6::Pty KF6::CoreAddons KF6::I18n)
     add_test(NAME native-process COMMAND test-native-process)
     set_tests_properties(native-process PROPERTIES TIMEOUT 45)
 endif()

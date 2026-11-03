@@ -181,19 +181,21 @@ QVector<TextLink> textLinks(const QString &line, const QString &directory, bool 
             path.replace(0, 1, QDir::homePath());
         }
 
+        // Handle absolute paths without filesystem existence checks.
         if (QDir::isRelativePath(path)) {
             if (directory.isEmpty()) {
                 continue;
             }
 
             path = QDir(directory).absoluteFilePath(path);
+            const QFileInfo info{path};
+
+            if (!info.isFile() && !info.isDir()) {
+                continue;
+            }
         }
 
-        const QFileInfo info{path};
-
-        if (info.isFile() || info.isDir()) {
-            result.append({start, label.size(), QUrl::fromLocalFile(info.absoluteFilePath()), label});
-        }
+        result.append({start, label.size(), QUrl::fromLocalFile(path), label});
     }
 
     std::sort(result.begin(), result.end(), [](const TextLink &a, const TextLink &b) {
@@ -610,6 +612,11 @@ QString TerminalView::searchStatus() const
 bool TerminalView::isSearchBusy() const
 {
     return m_search->isBusy();
+}
+
+qsizetype TerminalView::searchMatchCount() const
+{
+    return m_search->matchCount();
 }
 
 qreal TerminalView::scrollPosition() const

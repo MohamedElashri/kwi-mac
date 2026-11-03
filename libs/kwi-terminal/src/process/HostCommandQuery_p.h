@@ -9,6 +9,7 @@
 #include <QFile>
 #include <QHash>
 #include <QObject>
+#include <QProcessEnvironment>
 #include <QString>
 #include <QStringList>
 #include <QTimer>
@@ -35,7 +36,7 @@ public:
     explicit HostCommandQuery(QDBusConnection bus, QObject *parent = nullptr);
     ~HostCommandQuery() override;
 
-    void start(const QStringList &arguments, const QString &directory = QStringLiteral("/"));
+    void start(const QStringList &arguments, const QString &directory = QStringLiteral("/"), const QProcessEnvironment &environment = {});
 
 Q_SIGNALS:
     void finished(Kwi::HostCommandQuery::Result result, const QByteArray &output);

@@ -90,6 +90,33 @@ private Q_SLOTS:
         QVERIFY(bidi.visualFrame(selected).rows[0][bidi.visualCell({0, 0}).x()].flags & Selected);
     }
 
+    void fallbackGlyphsKeepLogicalColumns()
+    {
+        Terminal terminal;
+        terminal.resize(30, 2);
+        terminal.feed(QStringLiteral("A日B本CλD 中E").toUtf8());
+        Frame frame;
+        QVERIFY(terminal.snapshot(frame));
+        const auto metrics = fontMetrics(QFont(QStringLiteral("Menlo")), 2, 96);
+        GridShaper shaper;
+        shaper.setMetrics(metrics, 2);
+        const auto glyphs = shaper.shape(frame.rows[0], 0, 13);
+        for (const auto &[character, column] :
+             QList<QPair<QString, int>>{{QStringLiteral("日"), 1}, {QStringLiteral("本"), 4}, {QStringLiteral("λ"), 7}, {QStringLiteral("中"), 10}}) {
+            bool found = false;
+            for (const auto &glyph : glyphs) {
+                if (!glyph.font.supportsCharacter(character[0]))
+                    continue;
+                const auto indexes = glyph.font.glyphIndexesForString(character);
+                if (!indexes.isEmpty() && glyph.index == indexes[0]) {
+                    QCOMPARE(glyph.firstColumn, column);
+                    found = true;
+                }
+            }
+            QVERIFY2(found, qPrintable(character));
+        }
+    }
+
     void visualOrder()
     {
         Terminal terminal;

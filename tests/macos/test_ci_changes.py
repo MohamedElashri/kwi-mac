@@ -38,7 +38,7 @@ class CiChangesTest(unittest.TestCase):
 
     def classify(self, **extra):
         output = self.root / "step-output"
-        return subprocess.run([shutil.which("make"), "-f", str(ROOT / "Makefile"), "ci-changes"], cwd=self.root,
+        return subprocess.run([shutil.which("make"), "--no-print-directory", "-f", str(ROOT / "Makefile"), "ci-changes"], cwd=self.root,
                               env={**os.environ, "CI_BASE": self.base, "CI_HEAD": "HEAD", "CI_EVENT": "push", "CI_IS_TAG": "false",
                                    "GITHUB_OUTPUT": str(output), **extra}, capture_output=True, text=True, timeout=15)
 

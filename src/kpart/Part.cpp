@@ -27,7 +27,6 @@
 #include <QCheckBox>
 #include <QDir>
 #include <QEvent>
-#include <QFile>
 #include <QFileDialog>
 #include <QFontMetrics>
 #include <QIcon>
@@ -45,7 +44,6 @@
 #include <QWidget>
 #include <QtGlobal>
 #include <algorithm>
-#include <fcntl.h>
 #include <unistd.h>
 #include <utility>
 
@@ -285,7 +283,7 @@ void Part::addSessionWidget(TerminalSession *session)
     page->setSession(session);
     m_pages.insert(session, container);
     m_syncingTabs = true;
-    m_tabs->addTab(container, session->title());
+    m_tabs->insertTab(m_sessions->indexOf(session), container, session->title());
     m_syncingTabs = false;
 
     connect(
@@ -418,8 +416,7 @@ void Part::removeSessionWidget(TerminalSession *session)
         return;
     }
 
-    delete m_pendingPtys.take(session);
-    m_externalSessions.remove(session);
+    m_pendingPtys.remove(session);
     m_launchRequests.remove(session);
     auto *page = m_pages.take(session);
 
@@ -468,8 +465,8 @@ void Part::startShell(TerminalSession *session, const QString &directory)
 {
     auto *page = m_pages.value(session);
 
-    if (!session || !page || !page->terminal->terminalView() || (session->state() != Session::State::NotStarted && session->state() != Session::State::Failed)
-        || m_externalSessions.contains(session)) {
+    if (!session || !page || !page->terminal->terminalView()
+        || (session->state() != Session::State::NotStarted && session->state() != Session::State::Failed)) {
         return;
     }
 
@@ -480,18 +477,16 @@ void Part::startShell(TerminalSession *session, const QString &directory)
     }
 
     const auto launch = resolveLaunch(session->launchSettings(), request);
-    auto *pty = m_pendingPtys.take(session);
+    const auto pty = m_pendingPtys.take(session);
     page->terminal->setHostError({});
-    session->start(launch, pty ? pty->handle() : -1);
-    delete pty;
+    session->start(launch, pty.fileDescriptor());
 }
 
 void Part::startProgram(const QString &program, const QStringList &arguments)
 {
     auto *session = activeSession();
 
-    if (!session || !activeWidget() || (session->state() != Session::State::NotStarted && session->state() != Session::State::Failed)
-        || m_externalSessions.contains(session)) {
+    if (!session || !activeWidget() || (session->state() != Session::State::NotStarted && session->state() != Session::State::Failed)) {
         return;
     }
 
@@ -505,10 +500,9 @@ void Part::startProgram(const QString &program, const QStringList &arguments)
     auto request = m_launchRequests.value(session);
     request.command = QStringList{program} + (arguments.isEmpty() ? QStringList{} : arguments.mid(1));
     const auto launch = resolveLaunch(session->launchSettings(), request);
-    auto *pty = m_pendingPtys.take(session);
+    const auto pty = m_pendingPtys.take(session);
     activeWidget()->setHostError({});
-    session->start(launch, pty ? pty->handle() : -1);
-    delete pty;
+    session->start(launch, pty.fileDescriptor());
 }
 
 void Part::showShellInDir(const QString &directory)
@@ -597,35 +591,20 @@ void Part::openTeletype(int fd, bool runShell)
 {
     auto *session = activeSession();
 
-    if (!session || !activeWidget() || (session->state() != Session::State::NotStarted && session->state() != Session::State::Failed)
-        || m_externalSessions.contains(session)) {
+    if (!session || !activeWidget() || (session->state() != Session::State::NotStarted && session->state() != Session::State::Failed)) {
         return;
     }
 
-    const int duplicate{fd >= 0 ? fcntl(fd, F_DUPFD_CLOEXEC, 0) : -1};
+    const QDBusUnixFileDescriptor pty{fd};
 
-    if (duplicate < 0 || !isatty(duplicate)) {
-        if (duplicate >= 0) {
-            ::close(duplicate);
-        }
-
+    if (!pty.isValid() || !isatty(pty.fileDescriptor())) {
         activeWidget()->setHostError(i18nd("kwi", "The supplied terminal descriptor is invalid."));
 
         return;
     }
 
-    auto *pty = new QFile(session);
-
-    if (!pty->open(duplicate, QIODevice::ReadWrite, QFileDevice::AutoCloseHandle)) {
-        ::close(duplicate);
-        delete pty;
-        activeWidget()->setHostError(i18nd("kwi", "Could not attach the supplied terminal."));
-
-        return;
-    }
-
     activeWidget()->setHostError({});
-    delete m_pendingPtys.take(session);
+    m_pendingPtys.remove(session);
 
     if (runShell) {
         m_pendingPtys.insert(session, pty);
@@ -637,11 +616,7 @@ void Part::openTeletype(int fd, bool runShell)
             });
         }
     } else {
-        if (session->attachTeletype(pty->handle())) {
-            m_externalSessions.insert(session);
-        }
-
-        delete pty;
+        session->attachTeletype(pty.fileDescriptor());
     }
 }
 
@@ -726,9 +701,9 @@ void Part::setupActions()
         }
     });
 
-    KActionCollection::setDefaultShortcut(paste, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
+    KActionCollection::setDefaultShortcuts(paste, {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V), QKeySequence(Qt::SHIFT | Qt::Key_Insert)});
 
-    add("paste-selection", i18nd("kwi", "Paste Selection"), "edit-paste", QKeySequence(Qt::SHIFT | Qt::Key_Insert), [this] {
+    add("paste-selection", i18nd("kwi", "Paste Selection"), "edit-paste", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Insert), [this] {
         if (activeWidget()) {
             activeWidget()->terminalView()->pasteSelection();
         }
@@ -766,6 +741,7 @@ void Part::setupActions()
         saveOutput();
     });
 
+    saveAs->setText(i18ndc("kwi", "@action", "Save Output As…"));
     KActionCollection::setDefaultShortcut(saveAs, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S));
 
     add("clear-history", i18nd("kwi", "Clear Scrollback"), "edit-clear-history", {}, [this] {
@@ -774,7 +750,7 @@ void Part::setupActions()
         }
     });
 
-    add("clear-history-and-reset", i18nd("kwi", "Reset and Clear Terminal"), "edit-clear-history", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_K), [this] {
+    add("clear-history-and-reset", i18ndc("kwi", "@action", "Reset Terminal"), "edit-clear-history", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_K), [this] {
         if (activeSession()) {
             activeSession()->resetTerminal();
         }

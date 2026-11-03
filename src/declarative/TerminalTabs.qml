@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Kwi contributors
 // SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls as Controls
 import QtQuick.Layouts
@@ -22,8 +24,16 @@ RowLayout {
 
     // Clip the selected tab's frame opening to the scrolled viewport.
     readonly property real viewportLeft: tabBar.x + view.x
-    readonly property real selectedTabLeft: viewportLeft + Math.max(0, Math.min(view.width, tabBar.currentItem ? tabBar.currentItem.x - view.contentX : 0))
-    readonly property real selectedTabRight: viewportLeft + Math.max(0, Math.min(view.width, tabBar.currentItem ? tabBar.currentItem.x + tabBar.currentItem.width - view.contentX : 0))
+    readonly property real currentTabX: {
+        const current = tabBar.currentItem;
+
+        if (!current)
+            return 0;
+
+        return dragHelper.local && dragHelper.tab === current ? dragHelper.tabX : current.x - view.contentX;
+    }
+    readonly property real selectedTabLeft: viewportLeft + Math.max(0, Math.min(view.width, currentTabX))
+    readonly property real selectedTabRight: viewportLeft + Math.max(0, Math.min(view.width, currentTabX + (tabBar.currentItem ? tabBar.currentItem.width : 0)))
 
     // originX remains the content's left edge in right-to-left layouts.
     readonly property real occupiedLeft: view.originX - view.contentX
@@ -37,14 +47,31 @@ RowLayout {
     objectName: "terminalTabs"
     spacing: 0
 
+    onEnabledChanged: {
+        if (!enabled && dragHelper.local)
+            dragHelper.finish(Qt.IgnoreAction);
+    }
+
     // The drag must survive removal of its source tab delegate.
     Item {
         id: dragHelper
 
+        objectName: "terminalTabDrag"
         visible: false
 
         property string token: ""
         property var preview: null
+        property TerminalTabButton tab: null
+        property point hotSpot
+        property point pointerPosition
+        property bool exporting: false
+        readonly property bool local: tab !== null && !exporting
+        readonly property real tabX: tab ? Math.max(0, Math.min(root.view.width - tab.width, pointerPosition.x - hotSpot.x)) : 0
+
+        onTabChanged: {
+            if (!tab && token.length > 0 && !exporting)
+                finish(Qt.IgnoreAction);
+        }
 
         Drag.source: dragHelper
         Drag.dragType: Drag.Automatic
@@ -52,30 +79,68 @@ RowLayout {
         Drag.proposedAction: Qt.MoveAction
         Drag.mimeData: ({ "application/x-kwi-terminal-tab": token })
 
-        Drag.onDragFinished: action => {
+        Drag.onDragFinished: action => finish(action)
+
+        function finish(action: int): void {
             root.dragController.finishTabDrag(token, action);
             token = "";
+            tab = null;
+            exporting = false;
             dragHelper.Drag.imageSource = "";
             preview = null;
         }
 
-        function start(tab: Item, hotSpot: point): void {
+        function start(button: Item, session: TerminalSession, hotSpot: point, scenePosition: point): void {
+            const token = root.dragController.beginTabDrag(root.sessions, session);
+
+            if (token.length === 0)
+                return;
+
+            dragHelper.token = token;
+            dragHelper.hotSpot = hotSpot;
+            tab = button;
+            move(scenePosition);
+        }
+
+        function release(button: Item, accepted: bool): void {
+            if (tab !== button || !local)
+                return;
+
+            const dropped = accepted && root.dragController.dropTab(token, root.sessions, tabDrop.insertionIndex);
+            finish(dropped ? Qt.MoveAction : Qt.IgnoreAction);
+        }
+
+        function move(scenePosition: point): void {
+            if (!local)
+                return;
+
+            pointerPosition = root.view.mapFromItem(null, scenePosition);
+            const centerX = pointerPosition.x - hotSpot.x + tab.width / 2;
+            const centerY = pointerPosition.y - hotSpot.y + tab.height / 2;
+            const margin = 2 * tab.height;
+
+            if (centerX >= 0 && centerX <= root.view.width && centerY >= -margin && centerY <= root.view.height + margin)
+                return;
+
+            exporting = true;
             tab.grabToImage(result => {
-                if (!tab || !tab.dragGestureActive || !root.dragController)
+                if (!dragHelper.tab || !dragHelper.tab.dragGestureActive || !root.enabled) {
+                    dragHelper.finish(Qt.IgnoreAction);
                     return;
+                }
 
-                const token = root.dragController.beginTabDrag(root.sessions, tab.session);
-
-                if (token.length === 0)
-                    return;
-
-                dragHelper.token = token;
                 dragHelper.preview = result;
                 dragHelper.Drag.imageSource = result.url;
-                dragHelper.Drag.hotSpot = hotSpot;
+                dragHelper.Drag.hotSpot = dragHelper.hotSpot;
                 dragHelper.Drag.active = true;
             });
         }
+    }
+
+    Shortcut {
+        sequence: "Escape"
+        enabled: dragHelper.local
+        onActivated: dragHelper.finish(Qt.IgnoreAction)
     }
 
     function scrollTabs(distance: real): void {
@@ -133,7 +198,7 @@ RowLayout {
             setCurrentIndex(root.sessions.currentIndex);
 
             if (currentIndex >= 0)
-                contentItem.positionViewAtIndex(currentIndex, ListView.Contain);
+                root.view.positionViewAtIndex(currentIndex, ListView.Contain);
         }
 
         function navigateTo(index: int): void {
@@ -191,23 +256,53 @@ RowLayout {
                 tabPosition: root.position
                 showStatusIcons: root.showStatusIcons
                 draggable: root.dragController !== null
-                dragging: root.dragController !== null && root.dragController.draggedSession === session
+                dragging: dragHelper.Drag.active && dragHelper.tab === tabButton
+                readonly property bool moving: dragHelper.local && dragHelper.tab === tabButton
+                z: moving ? 1 : 0
+
+                transform: Translate {
+                    x: tabButton.moving ? dragHelper.tabX - tabButton.x + root.view.contentX : 0
+                }
+
+                // Carry the toolbar surface behind the moving tab's styled background.
+                Rectangle {
+                    anchors.fill: parent
+                    z: -2
+                    visible: tabButton.moving
+                    color: Kirigami.Theme.backgroundColor
+                }
 
                 onClicked: root.activated(index)
                 onCloseRequested: root.sessions.closeSession(index)
                 onContextRequested: root.contextRequested(session)
                 onRenameRequested: root.renameRequested(index)
-                onDragRequested: hotSpot => dragHelper.start(tabButton, hotSpot)
+                onDragRequested: (hotSpot, scenePosition) => dragHelper.start(tabButton, session, hotSpot, scenePosition)
+                onDragMoved: scenePosition => dragHelper.move(scenePosition)
+                onDragReleased: accepted => dragHelper.release(tabButton, accepted)
                 onNavigationRequested: key => tabBar.navigateKey(key)
             }
         }
 
-        WheelHandler {
-            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        MouseArea {
+            parent: root.view
+            anchors.fill: parent
+            z: 1
+            acceptedButtons: Qt.NoButton
+
+            property point accumulatedAngleDelta
 
             onWheel: event => {
-                const delta = event.pixelDelta.x || event.pixelDelta.y || event.angleDelta.x / 2 || event.angleDelta.y / 2;
-                root.scrollTabs(-delta);
+                accumulatedAngleDelta = Qt.point(accumulatedAngleDelta.x + event.angleDelta.x, accumulatedAngleDelta.y + event.angleDelta.y);
+                const direction = accumulatedAngleDelta.x >= 120 || accumulatedAngleDelta.y >= 120 ? -1
+                    : accumulatedAngleDelta.x <= -120 || accumulatedAngleDelta.y <= -120 ? 1 : 0;
+
+                if (direction !== 0) {
+                    accumulatedAngleDelta = Qt.point(0, 0);
+                    const index = Math.max(0, Math.min(root.count - 1, root.currentIndex + direction));
+
+                    if (index !== root.currentIndex)
+                        root.activated(index);
+                }
             }
         }
 
@@ -231,7 +326,9 @@ RowLayout {
             z: 2
             keys: ["application/x-kwi-terminal-tab"]
 
-            readonly property int insertionIndex: insertionAt(drag.x)
+            readonly property real pointerX: dragHelper.local ? dragHelper.pointerPosition.x : drag.x
+            readonly property bool reordering: containsDrag || dragHelper.local
+            readonly property int insertionIndex: insertionAt(pointerX)
 
             function insertionAt(position: real): int {
                 for (let index = 0; index < root.count; ++index) {
@@ -256,7 +353,7 @@ RowLayout {
                 return tab.x - root.view.contentX + ((trailing !== tabBar.mirrored) ? tab.width : 0);
             }
 
-            readonly property int scrollDirection: !containsDrag || !root.overflowing ? 0 : drag.x < Kirigami.Units.gridUnit ? -1 : drag.x > width - Kirigami.Units.gridUnit ? 1 : 0
+            readonly property int scrollDirection: !reordering || !root.overflowing ? 0 : pointerX < Kirigami.Units.gridUnit ? -1 : pointerX > width - Kirigami.Units.gridUnit ? 1 : 0
 
             onEntered: event => {
                 event.accepted = root.dragController !== null && root.dragController.acceptsTabDrag(event.getDataAsString("application/x-kwi-terminal-tab"));
@@ -271,7 +368,7 @@ RowLayout {
 
             Rectangle {
                 objectName: "terminalTabDropIndicator"
-                visible: tabDrop.containsDrag
+                visible: tabDrop.reordering
                 x: Math.max(0, Math.min(tabDrop.width - width, tabDrop.insertionX - width / 2))
                 y: Kirigami.Units.smallSpacing
                 width: Kirigami.Units.smallSpacing / 2

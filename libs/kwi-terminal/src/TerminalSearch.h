@@ -32,6 +32,7 @@ public:
 
     [[nodiscard]] QString status() const;
     [[nodiscard]] bool isBusy() const;
+    [[nodiscard]] qsizetype matchCount() const;
     [[nodiscard]] QRegion viewportMatches(bool viewportChanged);
 
 Q_SIGNALS:
@@ -44,7 +45,7 @@ private:
     void advance();
     void reset();
     void fail();
-    void setStatus(const QString &statusText, bool busy);
+    void setStatus(const QString &statusText, bool busy, qsizetype matches = -1);
 
     QPointer<Session> m_session;
     QMetaObject::Connection m_changedConnection;
@@ -52,6 +53,7 @@ private:
     QTimer m_stepTimer;
     std::optional<bool> m_navigation;
     QString m_status;
+    qsizetype m_matchCount{-1};
     bool m_feedPending{false};
     bool m_busy{false};
 };

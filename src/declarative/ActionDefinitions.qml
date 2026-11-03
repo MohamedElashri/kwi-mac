@@ -15,14 +15,14 @@ QtObject {
         AC.ActionData { name: "new_window"; text: KI18n.i18nc("@action", "New Window"); icon.name: "window-new"; defaultShortcut: definitions.macOS ? "Ctrl+N" : "Ctrl+Shift+N" }
         AC.ActionData { name: "new_tab"; text: KI18n.i18nc("@action", "New Tab"); icon.name: "tab-new"; defaultShortcut: definitions.macOS ? "Ctrl+T" : "Ctrl+Shift+T" }
         AC.ActionData { name: "close_tab"; text: KI18n.i18nc("@action", "Close Tab"); icon.name: "tab-close"; defaultShortcut: definitions.macOS ? "Ctrl+W" : "Ctrl+Shift+W" }
-        AC.ActionData { name: "rename_tab"; text: KI18n.i18nc("@action", "Rename Tab"); icon.name: "edit-rename"; defaultShortcut: "Ctrl+Alt+S" }
+        AC.ActionData { name: "rename_tab"; text: KI18n.i18nc("@action", "Rename Tab…"); icon.name: "edit-rename"; defaultShortcut: "Ctrl+Alt+S" }
         AC.ActionData { name: "next_tab"; text: KI18n.i18nc("@action", "Next Tab"); icon.name: "go-next"; defaultShortcut: definitions.macOS ? "Meta+Tab" : "Ctrl+PgDown" }
         AC.ActionData { name: "previous_tab"; text: KI18n.i18nc("@action", "Previous Tab"); icon.name: "go-previous"; defaultShortcut: definitions.macOS ? "Meta+Shift+Tab" : "Ctrl+PgUp" }
         AC.ActionData { name: "last_used_tab"; text: KI18n.i18nc("@action", "Last Used Tab"); icon.name: "tab-duplicate"; defaultShortcut: definitions.macOS ? "" : "Ctrl+Tab" }
         AC.ActionData { name: "move_tab_left"; text: KI18n.i18nc("@action", "Move Tab Left"); icon.name: "go-previous"; defaultShortcut: "Ctrl+Alt+Left" }
         AC.ActionData { name: "move_tab_right"; text: KI18n.i18nc("@action", "Move Tab Right"); icon.name: "go-next"; defaultShortcut: "Ctrl+Alt+Right" }
         AC.ActionData { name: "detach_tab"; text: KI18n.i18nc("@action", "Detach Tab"); icon.name: "window-new" }
-        AC.ActionData { name: "search_tabs"; text: KI18n.i18nc("@action", "Search Tabs"); icon.name: "tab-search"; defaultShortcut: "Ctrl+Shift+O" }
+        AC.ActionData { name: "search_tabs"; text: KI18n.i18nc("@action", "Search Tabs…"); icon.name: "tab-search"; defaultShortcut: "Ctrl+Shift+O" }
         AC.ActionData { name: "tab_1"; text: KI18n.i18nc("@action", "Switch to Tab %1", 1); icon.name: "tab"; defaultShortcut: definitions.macOS ? "Ctrl+1" : "Alt+1" }
         AC.ActionData { name: "tab_2"; text: KI18n.i18nc("@action", "Switch to Tab %1", 2); icon.name: "tab"; defaultShortcut: definitions.macOS ? "Ctrl+2" : "Alt+2" }
         AC.ActionData { name: "tab_3"; text: KI18n.i18nc("@action", "Switch to Tab %1", 3); icon.name: "tab"; defaultShortcut: definitions.macOS ? "Ctrl+3" : "Alt+3" }
@@ -39,8 +39,8 @@ QtObject {
         text: KI18n.i18nc("@title:group", "Text and Output")
 
         AC.ActionData { name: "copy"; text: KI18n.i18nc("@action", "Copy"); icon.name: "edit-copy"; defaultShortcut: definitions.macOS ? "Ctrl+C" : "Ctrl+Shift+C" }
-        AC.ActionData { name: "paste"; text: KI18n.i18nc("@action", "Paste"); icon.name: "edit-paste"; defaultShortcut: definitions.macOS ? "Ctrl+V" : "Ctrl+Shift+V" }
-        AC.ActionData { name: "paste_selection"; text: KI18n.i18nc("@action", "Paste Selection"); icon.name: "edit-paste"; defaultShortcut: "Shift+Ins" }
+        AC.ActionData { name: "paste"; text: KI18n.i18nc("@action", "Paste"); icon.name: "edit-paste"; defaultShortcut: definitions.macOS ? "Ctrl+V" : "Ctrl+Shift+V"; defaultAlternateShortcut: definitions.macOS ? "" : "Shift+Ins" }
+        AC.ActionData { name: "paste_selection"; text: KI18n.i18nc("@action", "Paste Selection"); icon.name: "edit-paste"; defaultShortcut: definitions.macOS ? "Shift+Ins" : "Ctrl+Shift+Ins" }
         AC.ActionData { name: "select_all"; text: KI18n.i18nc("@action", "Select All"); icon.name: "edit-select-all"; defaultShortcut: definitions.macOS ? "Ctrl+A" : "" }
         AC.ActionData { name: "selection_mode"; text: KI18n.i18nc("@action", "Keyboard Selection Mode"); icon.name: "edit-select"; defaultShortcut: "Ctrl+Shift+D" }
         AC.ActionData { name: "save_output"; text: KI18n.i18nc("@action", "Save Output As…"); icon.name: "document-save-as"; defaultShortcut: "Ctrl+Shift+S" }

@@ -1369,6 +1369,15 @@ bool Terminal::selectionGesture(const SelectionEvent &input)
     if (input.type == SelectionEvent::Type::Release)
         return true;
 
+    if (result == GHOSTTY_NO_VALUE && input.type == SelectionEvent::Type::Drag) {
+        GhosttySelectionGestureBehavior behavior{GHOSTTY_SELECTION_GESTURE_BEHAVIOR_CELL};
+        ghostty_selection_gesture_get(d->gesture, d->terminal, GHOSTTY_SELECTION_GESTURE_DATA_BEHAVIOR, &behavior);
+
+        // A word or line drag without a new range should retain the selection.
+        if (behavior != GHOSTTY_SELECTION_GESTURE_BEHAVIOR_CELL)
+            return true;
+    }
+
     bool viewportChanged{false};
 
     if (input.type == SelectionEvent::Type::Autoscroll) {

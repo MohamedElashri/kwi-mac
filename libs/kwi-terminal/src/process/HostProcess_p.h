@@ -7,9 +7,13 @@
 #include "ProcessController_p.h"
 #include <QDBusConnection>
 #include <QDBusPendingCall>
+#include <QDeadlineTimer>
 #include <QHash>
+#include <QList>
 #include <QPointer>
 #include <QString>
+#include <QStringList>
+#include <QTimer>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -53,21 +57,27 @@ private:
     };
 
     void cancelQueries();
+    void checkScopeManager(const TerminalLaunch &launch);
     void resolve(const TerminalLaunch &launch);
-    void spawn(const TerminalLaunch &launch, const QString &resolvedProgram);
+    void spawn(const TerminalLaunch &launch);
     void probe();
-    void completeRefresh(bool success);
+    void finishProbe(const std::optional<HostProcessProtocol::Observation> &observation, quint64 inputGeneration);
+    void completeRefresh(bool changed = false);
+    [[nodiscard]] bool waitingForLauncher() const;
     void beginCleanup();
     void finish(int exitCode);
     void fail(const QString &message);
 
     QDBusConnection m_bus;
     std::unique_ptr<KPtyDevice> m_device;
-    QPointer<HostCommandQuery> m_resolverQuery;
+    QPointer<HostCommandQuery> m_launchQuery;
     QPointer<HostCommandQuery> m_probeQuery;
     std::optional<QDBusPendingCall> m_spawn;
     std::function<void()> m_refreshCompletion;
     QHash<uint, uint> m_earlyExits;
+    QList<QStringList> m_startupCommands;
+    QDeadlineTimer m_startupDeadline;
+    QTimer m_startupTimer;
     ProcessInfo m_info;
     HostProcessProtocol::ProcessIdentity m_identity;
     QString m_initialExecutable;
@@ -76,7 +86,7 @@ private:
     uint m_pid{0};
     quint64 m_inputGeneration{0};
     bool m_interactiveShell{false};
+    bool m_useScopes{false};
     bool m_probePending{false};
-    bool m_dirty{true};
 };
 }

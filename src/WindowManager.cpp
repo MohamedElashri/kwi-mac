@@ -82,6 +82,8 @@ public:
     DesktopIntegration *desktop;
     QQmlApplicationEngine *engine;
     QPointer<QQuickWindow> window{};
+    // Keep asynchronous process cleanup alive after the window disappears.
+    QEventLoopLocker quitLock{};
     bool disposeAfterDrag{false};
 };
 
@@ -164,9 +166,6 @@ QString WindowManager::beginTabDrag(SessionModel *source, TerminalSession *sessi
     m_dragSource = source;
     m_draggedSession = session;
 
-    // Keep the drag helper alive if the last process exits during the drag.
-    m_dragQuitLock = std::make_unique<QEventLoopLocker>();
-
     Q_EMIT draggedSessionChanged();
 
     return m_dragToken;
@@ -203,7 +202,7 @@ void WindowManager::finishTabDrag(const QString &token, int action)
 
     m_dragFinishing = true;
 
-    // Defer teardown until Qt Quick returns from onDragFinished.
+    // Defer teardown until Qt Quick finishes handling the drag event.
     QTimer::singleShot(0, this, [this, token, action] {
         if (token != m_dragToken) {
             return;
@@ -247,8 +246,7 @@ void WindowManager::completeTabDrop(const QString &token)
 
         source->moveSession(from, to);
     } else {
-        destination->adoptSession(source->takeSession(from));
-        destination->moveSession(destination->count() - 1, to);
+        destination->adoptSession(source->takeSession(from), to);
     }
 
     destination->setCurrentIndex(destination->indexOf(session));
@@ -276,8 +274,6 @@ void WindowManager::clearTabDrag()
     if (sourceContext && sourceContext->disposeAfterDrag) {
         disposeWindow(sourceContext);
     }
-
-    m_dragQuitLock.reset();
 }
 
 void WindowManager::disposeWindow(WindowContext *context)
@@ -418,10 +414,8 @@ WindowManager::WindowContext *WindowManager::createWindow()
         }
     });
 
-    connect(context->window, &QWindow::visibleChanged, context, [this, context](bool visible) {
-        if (!visible && context->sessions->count() == 0) {
-            disposeWindow(context);
-        }
+    connect(context->sessions, &SessionModel::allClosed, context, [this, context] {
+        disposeWindow(context);
     });
     connect(context->sessions, &SessionModel::countChanged, context, [this, context] {
         // A window can already be hidden when its final tab closes. In that

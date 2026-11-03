@@ -34,6 +34,7 @@
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QQuickWindow>
+#include <QRegularExpression>
 #include <QSGRendererInterface>
 #include <QScopeGuard>
 #include <QSet>
@@ -325,6 +326,49 @@ private Q_SLOTS:
         commitMacTestText(m_window, QStringLiteral("سلام فارسی שלום"));
         QTRY_COMPARE(received(), QStringLiteral("سلام فارسی שלום").toUtf8());
         m_settings->setBidirectionalText(true);
+    }
+
+    void tabHistoryRetainsLogicalRtlSelection()
+    {
+        QTest::failOnWarning(QRegularExpression(QStringLiteral(".*TerminalTabButton.*")));
+        m_settings->setConfirmCloseRunning(false);
+        auto *model = m_windows->sessions(m_window);
+        const QString selected = QStringLiteral("selection سلام שלום");
+        m_session->feed((QStringLiteral("\033[2J\033[H") + selected).toUtf8());
+        QTest::qWait(80);
+        m_view->selectAll();
+        QTRY_COMPARE(m_view->selectedText(), selected);
+        Kwi::LaunchRequest request;
+        request.command = QStringList{QStringLiteral("/bin/sleep"), QStringLiteral("60")};
+        request.contextDirectory = m_directory.path();
+        QVERIFY(model->launchSession(request));
+        QPointer<Kwi::TerminalSession> second = model->currentSession();
+        QVERIFY(model->launchSession(request));
+        QPointer<Kwi::TerminalSession> third = model->currentSession();
+        model->setCurrentIndex(0);
+        QTRY_COMPARE(m_view->session(), m_session);
+        QTRY_COMPARE(m_view->selectedText(), selected);
+        QVERIFY(model->launchSession(request));
+        QPointer<Kwi::TerminalSession> inserted = model->currentSession();
+        QCOMPARE(model->indexOf(inserted), 1);
+        QCOMPARE(model->indexOf(second), 2);
+        QCOMPARE(model->indexOf(third), 3);
+        model->setCurrentIndex(model->indexOf(m_session));
+        QTRY_COMPARE(m_view->selectedText(), selected);
+        model->setCurrentIndex(model->indexOf(inserted));
+        model->setCurrentIndex(model->indexOf(third));
+        model->closeSession(model->indexOf(third));
+        QTRY_COMPARE(model->count(), 3);
+        QTRY_COMPARE(model->currentSession(), inserted.data());
+        model->setCurrentIndex(model->indexOf(m_session));
+        QTRY_COMPARE(m_view->selectedText(), selected);
+        m_view->find(QStringLiteral("سلام"));
+        QTRY_VERIFY(!m_view->isSearchBusy());
+        auto *bar = m_window->findChild<QQuickItem *>(QStringLiteral("terminalSearchBar"));
+        QVERIFY(bar);
+        m_window->setProperty("findVisible", true);
+        QTRY_VERIFY(bar->isVisible());
+        QTRY_VERIFY(bar->mapToScene(QPointF(0, bar->height())).y() <= m_view->mapToScene(QPointF()).y() + 1);
     }
 
     void readmeScreenshot()

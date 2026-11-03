@@ -5,7 +5,7 @@
 #include "NativeProcessInfo_p.h"
 #include "NativeProcess_p.h"
 #include "ProcessLaunch.h"
-#include "ProcessQueryLimits_p.h"
+#include "ProcessScope_p.h"
 
 #include <KLocalizedString>
 #include <KPtyDevice>
@@ -20,10 +20,8 @@
 #include <QThread>
 #include <QtConcurrentRun>
 #include <algorithm>
-#include <cerrno>
 #include <chrono>
 #include <csignal>
-#include <iterator>
 #include <termios.h>
 #include <unistd.h>
 #include <utility>
@@ -48,41 +46,6 @@ bool registeredShell(const QString &executable, const QProcessEnvironment &inher
     return std::ranges::any_of(shells, [&executable](const QString &shell) {
         return !shell.isEmpty() && QFileInfo(shell).canonicalFilePath() == executable;
     });
-}
-
-pid_t processInGroup(pid_t group, pid_t session)
-{
-    const pid_t leaderSession{getsid(group)};
-
-    if (leaderSession >= 0) {
-        return leaderSession == session ? group : -1;
-    }
-
-    if (kill(-group, 0) < 0 && errno == ESRCH) {
-        return -1;
-    }
-
-    // The group can outlive its leader, both during observation and cleanup.
-    return Kwi::NativeProcessInfo::groupMember(group, session);
-}
-
-QStringList processArguments(pid_t pid)
-{
-    const QByteArray bytes{Kwi::NativeProcessInfo::commandLine(pid)};
-
-    if (bytes.size() > Kwi::ProcessQueryLimits::MaximumCommandLineBytes || !bytes.endsWith('\0') || bytes.startsWith('\0')) {
-        return {};
-    }
-
-    const auto fields = bytes.chopped(1).split('\0');
-    QStringList arguments;
-    arguments.reserve(fields.size());
-
-    std::ranges::transform(fields, std::back_inserter(arguments), [](const QByteArray &field) {
-        return QString::fromLocal8Bit(field);
-    });
-
-    return arguments;
 }
 
 QString findProgram(const QString &program, const QString &workingDirectory, const QProcessEnvironment &environment)
@@ -115,77 +78,6 @@ QString findProgram(const QString &program, const QString &workingDirectory, con
 
 namespace Kwi
 {
-namespace
-{
-/** Observation of a local PTY. An attached PTY has no owned leader. */
-ProcessInfo localProcessInfo(KPtyDevice *device, qint64 leader, const QString &initialExecutable, bool interactiveShell, const ProcessInfo &previous)
-{
-    ProcessInfo info;
-    info.directory = previous.directory;
-    info.busy = true; // An unavailable foreground observation is not an idle shell.
-
-    if (!device || device->masterFd() < 0) {
-        return info;
-    }
-
-    const qint64 foreground{tcgetpgrp(device->masterFd())};
-    if (foreground <= 0) {
-        return info;
-    }
-    const qint64 target{foreground > 0 ? processInGroup(pid_t(foreground), leader > 0 ? pid_t(leader) : tcgetsid(device->masterFd())) : -1};
-
-    for (const qint64 pid : {target, leader}) {
-        if (pid <= 0) {
-            continue;
-        }
-
-        const QString directory{NativeProcessInfo::directory(pid_t(pid))};
-
-        if (!directory.isEmpty()) {
-            info.directory = directory;
-            break;
-        }
-    }
-
-    info.busy = foreground > 0 && (leader <= 0 || foreground != leader);
-
-    if (leader > 0 && !info.busy) {
-        const QString executable{NativeProcessInfo::executable(pid_t(leader))};
-        QStringList arguments{processArguments(pid_t(leader))};
-        const bool validArguments{!arguments.isEmpty()};
-
-        if (validArguments) {
-            arguments.removeFirst();
-        }
-
-        info.busy = !interactiveShell || executable.isEmpty() || executable != initialExecutable || !validArguments || !interactiveShellArguments(arguments);
-    }
-
-    if (info.busy && foreground > 0) {
-        info.foregroundPid = foreground;
-        const QString executable{target > 0 ? NativeProcessInfo::executable(pid_t(target)) : QString{}};
-        info.foregroundName = QFileInfo(executable).fileName();
-
-        if (info.foregroundName == QLatin1String("ssh")) {
-            const quint64 startTime{NativeProcessInfo::startTime(pid_t(target))};
-
-            if (startTime) {
-                // exec/re-written argv can change without changing PID or birth
-                // time. Metadata refresh is already bounded/coalesced; reread
-                // SSH argv here and reject a lifetime race around that query.
-                const auto arguments = processArguments(pid_t(target));
-                if (!arguments.isEmpty() && NativeProcessInfo::startTime(pid_t(target)) == startTime
-                    && NativeProcessInfo::executable(pid_t(target)) == executable) {
-                    info.ssh = {target, startTime, executable, info.directory, arguments};
-                }
-            }
-        }
-    }
-
-    return info;
-}
-}
-
 NativeProcess::NativeProcess()
 {
     m_terminateTimer.setSingleShot(true);
@@ -286,23 +178,20 @@ bool NativeProcess::start(const TerminalLaunch &launch)
     m_process->setPtyChannels(KPtyProcess::AllChannels);
     m_process->setInputChannelMode(QProcess::ForwardedInputChannel);
     m_process->setUseUtmp(false);
+    m_process->setProcessEnvironment(environment);
     m_process->setProgram(executable, arguments);
     m_process->setWorkingDirectory(m_info.directory);
     m_process->setUnixProcessParameters(QProcess::UnixProcessFlag::ResetSignalHandlers | QProcess::UnixProcessFlag::CloseFileDescriptors);
-    m_process->setProcessEnvironment(environment);
 
     connect(m_process.get(), &QProcess::started, this, [this] {
         m_pid = m_process->processId();
         device()->closeSlave();
-        const QPointer<NativeProcess> guard{this};
 
         if (m_closing) {
             beginClose();
+            return;
         }
-
-        if (guard != nullptr) {
-            Q_EMIT started();
-        }
+        Q_EMIT started();
     });
 
     connect(m_process.get(), &QProcess::finished, this, [this](int code, QProcess::ExitStatus status) {
@@ -321,11 +210,14 @@ bool NativeProcess::start(const TerminalLaunch &launch)
             return;
         }
 
+        const QString message{m_closing ? QString{} : i18n("Could not run the terminal command: %1", m_process->errorString())};
         const QPointer<NativeProcess> guard{this};
 
-        // QPointer construction cannot invalidate this context-bound callback's receiver.
-        // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-        Q_EMIT errorOccurred(i18n("Could not run the terminal command: %1", m_process->errorString()));
+        if (!message.isEmpty()) {
+            // QPointer construction cannot invalidate this context-bound callback's receiver.
+            // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
+            Q_EMIT errorOccurred(message);
+        }
 
         if (guard != nullptr && error == QProcess::FailedToStart) {
             closeTransport();
@@ -340,7 +232,7 @@ bool NativeProcess::start(const TerminalLaunch &launch)
     });
 
     const QPointer<NativeProcess> guard{this};
-    m_process->start();
+    ProcessScope::startNative(*m_process);
 
     if (guard != nullptr) {
         m_pid = m_process->processId();
@@ -385,11 +277,12 @@ void NativeProcess::invalidateProcessInfo(bool input)
     }
 }
 
-// The virtual contract owns callbacks for asynchronous backends. clazy:exclude-next-line=function-args-by-ref
+// The base method takes the callback by value so asynchronous backends can retain it. clazy:exclude-next-line=function-args-by-ref
 void NativeProcess::refreshProcessInfo(std::function<void()> completed)
 {
-    const auto info = m_process && m_process->state() == QProcess::Running ? localProcessInfo(device(), m_pid, m_initialExecutable, m_interactiveShell, m_info)
-                                                                           : processInfo();
+    const auto info = m_process && m_process->state() == QProcess::Running
+        ? NativeProcessInfo::observe(device()->masterFd(), m_pid, m_initialExecutable, m_interactiveShell, m_info)
+        : processInfo();
     const bool changed{info != m_info};
     m_info = info;
     const QPointer<NativeProcess> guard{this};
@@ -412,14 +305,14 @@ void NativeProcess::signalSession(int signal) const
     const int master{device()->masterFd()};
     const int foreground{master >= 0 ? tcgetpgrp(master) : m_closingForegroundGroup};
 
-    if (foreground > 0 && foreground != m_pid && foreground != getpgrp() && (master >= 0 || processInGroup(foreground, pid_t(m_pid)) > 0)) {
+    if (foreground > 0 && foreground != m_pid && foreground != getpgrp() && (master >= 0 || NativeProcessInfo::processInGroup(foreground, pid_t(m_pid)) > 0)) {
         kill(-foreground, signal);
     }
 
     if (isRunning()) {
         kill(-pid_t(m_pid), signal);
         kill(pid_t(m_pid), signal);
-    } else if (processInGroup(pid_t(m_pid), pid_t(m_pid)) > 0) {
+    } else if (NativeProcessInfo::processInGroup(pid_t(m_pid), pid_t(m_pid)) > 0) {
         kill(-pid_t(m_pid), signal);
     }
 }
@@ -446,130 +339,14 @@ void NativeProcess::close()
         return;
     }
 
-    if (!m_process || m_process->state() != QProcess::Starting) {
-        beginClose();
-    }
-}
-
-namespace
-{
-class AttachedProcess final : public ProcessController // clazy:exclude=ctor-missing-parent-argument,missing-qobject-macro
-{
-public:
-    bool open(int masterFd) override
-    {
-        if (masterFd < 0) {
-            Q_EMIT errorOccurred(i18n("Could not attach to an invalid terminal descriptor."));
-
-            return false;
-        }
-
-        if (!prepareMaster(masterFd)) {
-            return false;
-        }
-
-        m_device = std::make_unique<KPtyDevice>();
-
-        if (!m_device->open(m_master.fileDescriptor())) {
-            Q_EMIT errorOccurred(i18n("Could not attach to the terminal: %1", m_device->errorString()));
-
-            return false;
-        }
-
-        connect(m_device.get(), &KPtyDevice::readEof, this, [this] {
-            finish();
-        });
-
-        return true;
-    }
-
-    KPtyDevice *device() const override
-    {
-        return m_device.get();
-    }
-
-    bool start(const TerminalLaunch &) override
-    {
-        m_active = true;
-        device()->closeSlave();
-
-        Q_EMIT started();
-
-        return true;
-    }
-
-    void close() override
-    {
-        const QPointer<AttachedProcess> guard{this};
+    if (m_process && m_process->state() == QProcess::Starting) {
+        m_process->kill();
         closeTransport();
 
-        if (guard != nullptr) {
-            QTimer::singleShot(0, this, [this] {
-                finish();
-            });
-        }
+        return;
     }
 
-    bool isRunning() const override
-    {
-        return m_active;
-    }
-
-    qint64 processId() const override
-    {
-        return -1;
-    }
-
-    QString program() const override
-    {
-        return {};
-    }
-
-    ProcessInfo processInfo() const override
-    {
-        return m_active ? m_info : ProcessInfo{};
-    }
-
-    void invalidateProcessInfo(bool input) override
-    {
-        if (input && m_active) {
-            m_info.busy = true;
-        }
-    }
-
-    // The virtual contract owns callbacks for asynchronous backends. clazy:exclude-next-line=function-args-by-ref
-    void refreshProcessInfo(std::function<void()> completed = {}) override
-    {
-        const auto info = m_active ? localProcessInfo(device(), -1, {}, false, m_info) : ProcessInfo{};
-        const bool changed{info != m_info};
-        m_info = info;
-        const QPointer<AttachedProcess> guard{this};
-
-        if (changed) {
-            Q_EMIT processInfoChanged();
-        }
-
-        if (guard != nullptr && completed) {
-            completed();
-        }
-    }
-
-private:
-    void finish()
-    {
-        if (std::exchange(m_active, false)) {
-            Q_EMIT finished(0);
-        }
-    }
-
-    std::unique_ptr<KPtyDevice> m_device;
-    ProcessInfo m_info;
-    bool m_active{false};
-};
+    beginClose();
 }
 
-std::unique_ptr<ProcessController> attachedProcess()
-{
-    return std::make_unique<AttachedProcess>();
-}
 }

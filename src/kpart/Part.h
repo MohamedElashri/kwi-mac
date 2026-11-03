@@ -6,11 +6,11 @@
 #include "settings/LaunchSettings.h"
 
 #include <KParts/ReadOnlyPart>
+#include <QDBusUnixFileDescriptor>
 #include <QHash>
 #include <QKeySequence>
 #include <QList>
 #include <QPointer>
-#include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QVariant>
@@ -22,7 +22,6 @@ class KPluginMetaData;
 class KXMLGUIClient;
 class QAction;
 class QEvent;
-class QFile;
 class QKeyEvent;
 class QPoint;
 class QTabWidget;
@@ -129,9 +128,8 @@ private:
     std::unique_ptr<KXMLGUIClient> m_terminalClient;
 
     QHash<TerminalSession *, Page *> m_pages{};
-    QHash<TerminalSession *, QFile *> m_pendingPtys{};
+    QHash<TerminalSession *, QDBusUnixFileDescriptor> m_pendingPtys{};
     QHash<TerminalSession *, LaunchRequest> m_launchRequests{};
-    QSet<TerminalSession *> m_externalSessions{};
     QList<QPointer<QAction>> m_additionalActions{};
 
     QPointer<QObject> m_shortcutOrigin{};

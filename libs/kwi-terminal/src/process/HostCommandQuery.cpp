@@ -60,7 +60,7 @@ HostCommandQuery::~HostCommandQuery()
     cancelCommand();
 }
 
-void HostCommandQuery::start(const QStringList &arguments, const QString &directory)
+void HostCommandQuery::start(const QStringList &arguments, const QString &directory, const QProcessEnvironment &environment)
 {
     Q_ASSERT(m_phase == Phase::Ready);
 
@@ -97,7 +97,7 @@ void HostCommandQuery::start(const QStringList &arguments, const QString &direct
 
     const Protocol::FileDescriptors descriptors{{1, outputWriter}, {2, errorWriter}};
     m_spawn = new QDBusPendingCallWatcher(
-        m_bus.asyncCall(Protocol::command(directory, Protocol::boundedQueryCommand(arguments), {}, descriptors, Protocol::CommandFlags::WatchBus),
+        m_bus.asyncCall(Protocol::command(directory, Protocol::boundedQueryCommand(arguments), environment, descriptors, Protocol::CommandFlags::WatchBus),
                         Protocol::CallTimeoutMs),
         this);
 

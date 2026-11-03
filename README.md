@@ -24,6 +24,15 @@ extract it, and move `Kwi.app` to Applications. See the release notes for system
 requirements and signing information. Builds are currently ad-hoc signed and
 are not notarized; macOS may require approval before opening them.
 
+If you receive a warning stating *"Apple could not verify 'Kwi.app' is free of malware that may harm your Mac or compromise your privacy"*, macOS Gatekeeper has quarantined the app because it is not yet signed or notarized.
+
+```bash
+xattr -cr /Applications/Kwi.app
+```
+
+*Note: If your app is located in the Downloads folder or elsewhere, replace `/Applications/Kwi.app` with the correct path to the app.*
+
+
 **⌘T** opens a tab, **⌘F** searches output, and **⌘,** opens settings.
 Option-as-Alt is available under **Behavior**.
 

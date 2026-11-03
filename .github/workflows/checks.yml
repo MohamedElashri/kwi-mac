@@ -17,10 +17,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type != 'tag') }}
-
 jobs:
   checks:
     runs-on: ubuntu-latest
@@ -30,12 +26,21 @@ jobs:
     outputs:
       commit: ${{ steps.source.outputs.commit }}
       tag: ${{ steps.source.outputs.tag }}
+      build: ${{ steps.changes.outputs.build }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.tag || github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Classify changed files
+        id: changes
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          CI_IS_TAG: ${{ github.ref_type == 'tag' || inputs.tag != '' }}
+          CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CI_HEAD: ${{ github.sha }}
+        run: make ci-changes
       - name: Check tools and source formatting
         run: make check
       - name: Validate release tag
@@ -49,8 +54,12 @@ jobs:
 
   build:
     needs: checks
+    if: needs.checks.outputs.build == 'true'
     runs-on: xcode-27
     timeout-minutes: 360
+    concurrency:
+      group: ci-build-${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type != 'tag') }}
     env:
       EXPECTED_COMMIT: ${{ needs.checks.outputs.commit }}
     steps:
@@ -87,6 +96,9 @@ jobs:
     if: needs.checks.outputs.tag != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: release-${{ needs.checks.outputs.tag }}
+      cancel-in-progress: false
     permissions:
       contents: write
     env:

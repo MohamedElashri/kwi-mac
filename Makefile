@@ -30,7 +30,7 @@ CTEST = "$(PREFIX)/dev-utils/bin/ctest" --test-dir "$(TEST_BUILD)" --output-on-f
 
 .PHONY: all help doctor prepare dependencies configure build check lint test-tools test-native test test-gui \
         sources record-dependencies bundle run package release-assets verify-release validate-release release ci \
-        workloads smoke startup benchmark memory compatibility performance presentation upstream clean
+        workloads smoke startup benchmark memory compatibility performance presentation screenshot ci-changes upstream clean
 
 all: build
 
@@ -104,6 +104,20 @@ release: validate-release verify-release ## Create or refresh a draft from exist
 
 ci: check release-assets ## Run the complete CI build, tests and packaging pipeline
 
+ci-changes: ## Classify CI changes; documentation skips the native build
+	@set -euo pipefail; \
+	build=true; base="$${CI_BASE:-}"; head="$${CI_HEAD:-HEAD}"; \
+	if [ "$${CI_EVENT:-}" != workflow_dispatch ] && [ "$${CI_IS_TAG:-false}" != true ] \
+	   && [ -n "$$base" ] && [ "$$base" != 0000000000000000000000000000000000000000 ]; then \
+	  changed=$$(git diff --name-only --no-renames "$$base" "$$head" --); \
+	  build=false; \
+	  while IFS= read -r path; do \
+	    case "$$path" in ''|*.md|*.md.license|docs/*|assets/readme/*) ;; *) build=true; break ;; esac; \
+	  done <<< "$$changed"; \
+	fi; \
+	printf 'build=%s\n' "$$build"; \
+	if [ -n "$${GITHUB_OUTPUT:-}" ]; then printf 'build=%s\n' "$$build" >> "$$GITHUB_OUTPUT"; fi
+
 workloads: ## Generate deterministic GUI/performance fixtures
 	"$(PYTHON)" scripts/macos/workloads.py --output "$(CURDIR)/build-macos/workloads"
 
@@ -127,6 +141,13 @@ performance: build workloads ## Run focused native performance checks; select me
 
 presentation: ## Analyze performance presentation traces
 	"$(PYTHON)" scripts/macos/presentation.py --directory "$(RESULTS_DIR)/performance" $(ARGS)
+
+screenshot: build ## Capture a private demo window for the README
+	@set -euo pipefail; mkdir -p "$(RESULTS_DIR)"; \
+	capture=$$(mktemp -d "$(RESULTS_DIR)/readme.XXXXXX"); \
+	"$(PYTHON)" scripts/macos/run-gui-test.py --executable "$(TEST_BUILD)/bin/test-macos-interaction.app/Contents/MacOS/test-macos-interaction" --output "$$capture/session" --timeout 45 -- readmeScreenshot; \
+	mkdir -p assets/readme; \
+	cp "$$capture/session/readme.png" assets/readme/screenshot.png
 
 upstream: ## Fetch KDE master and report unmerged changes
 	@set -euo pipefail; \

@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: none
 # SPDX-License-Identifier: CC0-1.0
 """Safety checks for build-prefix ownership and checksum-verified source downloads."""
+import json
 import hashlib
 import importlib.util
 import contextlib
@@ -23,6 +24,26 @@ def load(name):
 
 
 class BuildToolsTest(unittest.TestCase):
+    def test_cached_vt_rebuilds_when_local_patch_changes(self):
+        craft = load("craft")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            patch = root / "craft/kwi/libghostty-vt/bidi.patch"
+            patch.parent.mkdir(parents=True)
+            patch.write_text("first revision")
+            prefix = root / "prefix"
+            record = prefix / "share/kwi/ghostty-build-inputs.json"
+            record.parent.mkdir(parents=True)
+            expected = [{"path": str(patch.relative_to(root)), "sha256": hashlib.sha256(patch.read_bytes()).hexdigest()}]
+            record.write_text(json.dumps({"patches": expected}))
+            with mock.patch.object(craft, "ROOT", root), mock.patch.object(craft, "run") as run:
+                craft.refresh_vt_patches(prefix, {})
+                run.assert_not_called()
+                patch.write_text("changed revision")
+                craft.refresh_vt_patches(prefix, {})
+                self.assertIn("--unpack", run.call_args.args[0])
+                self.assertEqual(run.call_args.args[0][-1], "kwi/libghostty-vt")
+
     def test_invalid_job_count_does_not_modify_a_prefix(self):
         craft = load("craft")
         with tempfile.TemporaryDirectory() as directory:

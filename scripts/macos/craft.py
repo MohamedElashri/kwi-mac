@@ -148,6 +148,20 @@ srcDir = {ROOT}
     (prefix / "etc/kwi-craft-patch.json").write_text(json.dumps({"patches": patches, "purpose": "Optional D-Bus LaunchAgent autostart disabled by KWI_CRAFT_NO_DBUS_AUTOSTART"}, indent=2) + "\n")
 
 
+def refresh_vt_patches(prefix, env):
+    record = prefix / "share/kwi/ghostty-build-inputs.json"
+    if not record.exists():
+        return
+    expected = [{"path": str(path.relative_to(ROOT)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+                for path in sorted((ROOT / "craft/kwi/libghostty-vt").glob("*.patch"))]
+    if json.loads(record.read_text()).get("patches", []) == expected:
+        return
+    # Re-extract the verified archive so an older local patch is never stacked
+    # underneath its replacement. Compiler caches remain reusable.
+    run([PYTHON, prefix / "craft/bin/craft.py", "--ci-mode", "--unpack", "--make", "--install",
+         "--post-install", "--qmerge", "--post-qmerge", "kwi/libghostty-vt"], env=env, cwd=ROOT)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prefix", type=Path, default=ROOT / "build-macos/craft-root")
@@ -175,6 +189,8 @@ def main():
     command = args.args[1:] if args.args[:1] == ["--"] else args.args
     if not command:
         parser.error("Provide Craft arguments after run")
+    if "--configure" in command and "kwi/kwi" in command:
+        refresh_vt_patches(prefix, env)
     run([PYTHON, prefix / "craft/bin/craft.py", "--ci-mode", *command], env=env, cwd=ROOT)
     return 0
 

@@ -1,0 +1,181 @@
+--- a/src/terminal/Terminal.zig
++++ b/src/terminal/Terminal.zig
+@@ -79,6 +79,14 @@
+ /// The previous printed character. This is used for the repeat previous
+ /// char CSI (ESC [ <n> b).
+ previous_char: ?u21 = null,
++
++// Leading Unicode direction controls have no cell of their own. Keep them
++// until a printable base arrives, then store the original scalar sequence
++// in that cell so formatting, search, scrollback and reflow retain it.
++pending_bidi: std.ArrayList(u21) = .empty,
++pending_bidi_screen: ?*Screen = null,
++pending_bidi_x: size.CellCountInt = 0,
++pending_bidi_y: size.CellCountInt = 0,
+ 
+ /// The modes that this terminal currently has active.
+ modes: modespkg.ModeState = .{},
+@@ -393,6 +401,7 @@
+ }
+ 
+ pub fn deinit(self: *Terminal, alloc: Allocator) void {
++    self.pending_bidi.deinit(alloc);
+     self.tabstops.deinit(alloc);
+     self.screens.deinit(alloc);
+     self.colors.palette.deinit(alloc);
+@@ -685,6 +694,7 @@
+     allow_unicode: bool,
+ ) !usize {
+     const screen: *Screen = self.screens.active;
++    if (self.pending_bidi.items.len > 0) return 0;
+ 
+     // Codepoints in [0x10, 0xFF] are always narrow (width 1, matching
+     // the c <= 0xFF fast path in print) and can never interact with
+@@ -1308,6 +1318,34 @@
+     else
+         self.scrolling_region.right + 1;
+ 
++    if (self.pending_bidi.items.len > 0 and
++        (self.pending_bidi_screen != self.screens.active or
++            self.pending_bidi_x != self.screens.active.cursor.x or
++            self.pending_bidi_y != self.screens.active.cursor.y))
++    {
++        self.pending_bidi.clearRetainingCapacity();
++    }
++    if (isBidiControl(c)) {
++        const left: size.CellCountInt = if (self.modes.get(.wraparound) and self.screens.active.cursor.pending_wrap) 0 else 1;
++        if (self.pending_bidi.items.len == 0 and (self.screens.active.cursor.x > 0 or left == 0)) {
++            const immediate = self.screens.active.cursorCellLeft(left);
++            const prev = if (immediate.wide == .spacer_tail) self.screens.active.cursorCellLeft(left + 1) else immediate;
++            if (prev.hasText()) {
++                self.screens.active.cursorMarkDirty();
++                try self.screens.active.appendGrapheme(prev, c);
++                return;
++            }
++        }
++        // Bound malformed streams of controls independently of scrollback size.
++        if (self.pending_bidi.items.len < 4096) {
++            try self.pending_bidi.append(self.gpa(), c);
++            self.pending_bidi_screen = self.screens.active;
++            self.pending_bidi_x = self.screens.active.cursor.x;
++            self.pending_bidi_y = self.screens.active.cursor.y;
++        }
++        return;
++    }
++
+     // Perform grapheme clustering if grapheme support is enabled (mode 2027).
+     // This is MUCH slower than the normal path so the conditional below is
+     // purposely ordered in least-likely to most-likely so we can drop out
+@@ -1585,6 +1623,7 @@
+             @branchHint(.likely);
+             self.screens.active.cursorMarkDirty();
+             @call(.always_inline, printCell, .{ self, c, .narrow, charset });
++            try self.applyBidiPrefix();
+         },
+ 
+         // Wide character requires a spacer. We print this by
+@@ -1619,6 +1658,7 @@
+ 
+             self.screens.active.cursorMarkDirty();
+             self.printCell(c, .wide, charset);
++            try self.applyBidiPrefix();
+             self.screens.active.cursorRight(1);
+             self.writeCell(0, .spacer_tail);
+         } else {
+@@ -1640,6 +1680,22 @@
+ 
+     // Move the cursor
+     self.screens.active.cursorRight(1);
++}
++
++fn isBidiControl(c: u21) bool {
++    return c == 0x061c or c == 0x200e or c == 0x200f or
++        (c >= 0x202a and c <= 0x202e) or (c >= 0x2066 and c <= 0x2069);
++}
++
++fn applyBidiPrefix(self: *Terminal) !void {
++    if (self.pending_bidi.items.len == 0) return;
++    defer self.pending_bidi.clearRetainingCapacity();
++    const base = self.screens.active.cursor.page_cell.content.codepoint.data;
++    self.screens.active.cursor.page_cell.content.codepoint.data = self.pending_bidi.items[0];
++    for (self.pending_bidi.items[1..]) |control| {
++        try self.screens.active.appendGrapheme(self.screens.active.cursor.page_cell, control);
++    }
++    try self.screens.active.appendGrapheme(self.screens.active.cursor.page_cell, base);
+ }
+ 
+ /// Prints the character unmapped_c into the cell under the cursor, mapped
+@@ -5105,6 +5161,7 @@
+ /// this will reuse the existing memory. In the latter case, memory may
+ /// be wasted (since its unused) but it isn't leaked.
+ pub fn fullReset(self: *Terminal) void {
++    self.pending_bidi.clearRetainingCapacity();
+     // Ensure we're back on primary screen
+     self.screens.switchTo(.primary);
+ 
+@@ -5155,6 +5212,7 @@
+ /// reset does: left and right margins, the cursor style, the color palette,
+ /// modifyOtherKeys, and the XTCHECKSUM variant.
+ pub fn softReset(self: *Terminal) void {
++    self.pending_bidi.clearRetainingCapacity();
+     const reset_modes = [_]modespkg.Mode{
+         .cursor_visible,
+         .insert,
+--- a/src/terminal/formatter.zig
++++ b/src/terminal/formatter.zig
+@@ -1440,7 +1440,7 @@
+                     // Trailing spaces are blank. We know it is trailing
+                     // because if we get a non-empty cell later we'll
+                     // fill the blanks.
+-                    if (cell.codepoint() == ' ' and self.opts.trim) {
++                    if (cell.codepoint() == ' ' and !cell.hasGrapheme() and self.opts.trim) {
+                         blank_cells += 1;
+                         continue;
+                     }
+@@ -1808,7 +1808,7 @@
+                 }
+ 
+                 // Trailing spaces are blank.
+-                if (cp == ' ' and self.opts.trim) {
++                if (cp == ' ' and !cell.hasGrapheme() and self.opts.trim) {
+                     pending += 1;
+                     continue;
+                 }
+--- a/src/terminal/Screen.zig
++++ b/src/terminal/Screen.zig
+@@ -3326,7 +3326,7 @@
+                 whitespace,
+                 cell.content.codepoint.data,
+             ) != null;
+-            if (this_whitespace) continue;
++            if (this_whitespace and !cell.hasGrapheme()) continue;
+ 
+             break :start p;
+         }
+@@ -3348,7 +3348,7 @@
+                 whitespace,
+                 cell.content.codepoint.data,
+             ) != null;
+-            if (this_whitespace) continue;
++            if (this_whitespace and !cell.hasGrapheme()) continue;
+ 
+             break :end p;
+         }
+@@ -3380,7 +3380,7 @@
+                 whitespace,
+                 &[_]u32{cell.content.codepoint.data},
+             ) != null;
+-            if (this_whitespace) continue;
++            if (this_whitespace and !cell.hasGrapheme()) continue;
+ 
+             break :start p;
+         }
+@@ -3404,7 +3404,7 @@
+                 whitespace,
+                 &[_]u32{cell.content.codepoint.data},
+             ) != null;
+-            if (this_whitespace) continue;
++            if (this_whitespace and !cell.hasGrapheme()) continue;
+ 
+             break :end p;
+         }

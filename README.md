@@ -10,68 +10,78 @@ SPDX-License-Identifier: CC0-1.0
 [![Platform](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple&logoColor=white)](https://github.com/MohamedElashri/kwi-mac/releases/latest)
 [![License](https://img.shields.io/badge/license-GPL%20%2F%20LGPL-blue)](LICENSES/)
 
-An Apple Silicon port of [KDE Kwi](https://invent.kde.org/utilities/kwi), powered
-by libghostty-vt, Qt Quick and KDE Frameworks, with Metal-accelerated rendering.
+An independent Apple Silicon port of [KDE Kwi](https://invent.kde.org/utilities/kwi),
+with Metal-accelerated rendering powered by libghostty-vt, Qt Quick and KDE Frameworks.
 
-- Tabs, retained output, search and keyboard selection.
-- Launch presets, color schemes and customizable shortcuts.
-- Mac keyboard handling, with optional Option-as-Alt.
+![Kwi on macOS with three tabs, truecolor output and Unicode text](assets/readme/screenshot.png)
+
+- **A tabbed workspace:** scrollback, search and keyboard selection.
+- **Your setup:** launch presets, color schemes, fonts and configurable shortcuts.
+- **Mac input:** familiar keyboard shortcuts and optional Option-as-Alt.
 
 ## Install
 
-Download `Kwi-arm64.zip` from the [latest release](https://github.com/MohamedElashri/kwi-mac/releases/latest),
-extract it, and move `Kwi.app` to Applications. See the release notes for system
-requirements and signing information. Builds are currently ad-hoc signed and
-are not notarized; macOS may require approval before opening them.
+Download **Kwi-arm64.zip** from the [latest release](https://github.com/MohamedElashri/kwi-mac/releases/latest),
+extract it, and move **Kwi.app** to Applications. System requirements are listed in
+its release notes. Builds are ad-hoc signed and not notarized.
 
-If you receive a warning stating *"Apple could not verify 'Kwi.app' is free of malware that may harm your Mac or compromise your privacy"*, macOS Gatekeeper has quarantined the app because it is not yet signed or notarized.
+If macOS blocks the first launch, follow [Apple’s Open Anyway instructions](https://support.apple.com/en-us/102445).
+For a trusted download, you can also remove its quarantine attribute in Terminal:
 
-```bash
-xattr -cr /Applications/Kwi.app
+```sh
+xattr -dr com.apple.quarantine /Applications/Kwi.app
 ```
 
-*Note: If your app is located in the Downloads folder or elsewhere, replace `/Applications/Kwi.app` with the correct path to the app.*
-
+Adjust the path if you installed the app elsewhere.
 
 **⌘T** opens a tab, **⌘F** searches output, and **⌘,** opens settings.
-Option-as-Alt is available under **Behavior**.
+Enable **Use Option as Alt** under **Behavior** when needed.
 
-## Build
+## Build and test
 
-Use an Apple Silicon Mac with full Xcode, Git and Python 3.11 or later. Dependency
-versions are pinned; Craft manages a project-local prefix. The root Makefile is
-the entry point for local development and CI.
+Requires an Apple Silicon Mac, full Xcode, Git and Python 3.11 or later.
+Dependencies are pinned and installed into a project-local Craft prefix.
+The root [Makefile](Makefile) is the shared entry point for development and CI.
 
 ```sh
 make build
-make test
 make run
 ```
 
-Make uses the Xcode selected by `xcode-select`; set `DEVELOPER_DIR` to a full Xcode
-`Contents/Developer` directory if Command Line Tools is selected. `make help`
-lists all commands. Use `JOBS=2` to limit compiler parallelism and `ARGS='…'` to
-pass options to test or measurement tools. `make test-gui` needs a focused,
-logged-in Mac session; performance and app campaigns are explicit targets.
+Make uses the Xcode selected by `xcode-select`. If Command Line Tools is selected,
+set `DEVELOPER_DIR` to your full Xcode `Contents/Developer` directory.
+Use `JOBS=2` to limit compiler parallelism.
 
-`make ci` runs checks, builds, headless tests and verified release packaging.
-`make package` produces the app and matching sources; commit local changes first
-so the source archive matches the build. Python helpers in `scripts/macos/`
-implement deployment and verification behind the Makefile.
+| Command | Purpose |
+| --- | --- |
+| `make test` | Tooling and headless native tests |
+| `make test-gui` | GUI checks in a focused Mac session |
+| `make package` | Verified app archive and matching sources |
+| `make ci` | Full build, tests and release packaging |
+| `make screenshot` | Recreate the isolated demo screenshot |
+| `make help` | All targets, measurements and configuration options |
 
-## Development
+Commit changes before packaging so the source archive matches the build.
+Python helpers in `scripts/macos/` implement deployment and verification behind Make.
 
-This is an independent macOS port. KDE's original Git history is retained, and
-[upstream tracking](https://github.com/MohamedElashri/kwi-mac/actions/workflows/upstream.yml)
-reports new changes weekly through `make upstream`. Fetch KDE's `master` through
-an `upstream` remote, merge updates on a review branch, and build/test before
-merging into `main`.
+## CI and releases
 
-The [CI workflow](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml)
-uses `make check` and `make ci` on pushes and pull requests. Version tags also run
-`make release` to verify assets and prepare a draft for publication. Locally,
-check out the tag, run `make ci`, then `make release TAG=<tag>`.
-Downloads include checksums, dependency metadata and source information.
+[CI](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml)
+runs `make check` on every push and pull request. Source, build-system and workflow
+changes also run `make ci` on a hosted Apple Silicon Mac. Documentation-only changes
+skip the Mac build; manual runs and version tags always run the full pipeline.
+
+Version tags must match the CMake project version. CI verifies the downloads and
+uses `make release` to prepare a draft for review. To prepare one locally, check out
+the tag, run `make ci`, then `make release TAG=<tag>`. Downloads include checksums,
+dependency metadata, license notices and matching application/dependency sources.
+
+## Following KDE
+
+The original Git history is retained. `make upstream` fetches KDE’s `master` and
+reports unmerged commits; the [upstream workflow](https://github.com/MohamedElashri/kwi-mac/actions/workflows/upstream.yml)
+runs it weekly. Review and merge updates on a separate branch, then build and test
+before merging into `main`.
 
 ## License
 

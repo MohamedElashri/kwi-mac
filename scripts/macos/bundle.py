@@ -267,7 +267,7 @@ def main():
     (resources / "qt.conf").write_text("[Paths]\nPlugins=PlugIns\nQmlImports=Resources/qml\n")
     info_path = app / "Contents/Info.plist"
     info = plistlib.loads(info_path.read_bytes())
-    info.update(CFBundleName="Kwi", CFBundleDisplayName="Kwi", CFBundleIdentifier="org.kde.kwi", LSMinimumSystemVersion="14.4")
+    info.update(CFBundleDisplayName=info["CFBundleName"], CFBundleIdentifier="org.kde.kwi", LSMinimumSystemVersion="14.4")
     info_path.write_bytes(plistlib.dumps(info))
     resource_inventory = inventory_resources(app)
     binaries = audit(app)

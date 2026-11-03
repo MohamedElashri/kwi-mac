@@ -3,16 +3,16 @@ SPDX-FileCopyrightText: 2026 Eike Hein <hein@kde.org>
 SPDX-FileCopyrightText: 2026 Mohamed Elashri <mail@elashri.com>
 SPDX-License-Identifier: CC0-1.0
 -->
-# <img src="logo.png" width="32" alt=""/> Kwi for macOS
+# <img src="logo.png" width="32" alt=""/> Kwi Mac
 
 [![CI](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml)
 [![Latest release](https://img.shields.io/github/v/release/MohamedElashri/kwi-mac)](https://github.com/MohamedElashri/kwi-mac/releases/latest)
 [![Platform](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple&logoColor=white)](https://github.com/MohamedElashri/kwi-mac/releases/latest)
 [![License](https://img.shields.io/badge/license-GPL%20%2F%20LGPL-blue)](LICENSES/)
 
-A Metal-accelerated terminal for Apple Silicon. An independent macOS port of
-[KDE Kwi](https://invent.kde.org/utilities/kwi), built with Qt Quick,
-KDE Frameworks and libghostty-vt.
+A Metal-accelerated terminal for Apple Silicon. An independently maintained
+macOS fork of [KDE Kwi](https://invent.kde.org/utilities/kwi), with bidirectional
+Arabic, Persian and Hebrew support. Built with Qt Quick, KDE Frameworks and libghostty-vt.
 
 ![Kwi with tabbed sessions, truecolor output and Unicode text](assets/readme/screenshot.png)
 
@@ -46,6 +46,10 @@ Bidirectional rendering is enabled by default. For applications that already
 arrange RTL text themselves, turn it off under **Terminal → Text direction**.
 
 ## Development
+
+Kwi Mac has its own versions, releases and support, maintained by
+[Mohamed Elashri](https://github.com/MohamedElashri). We regularly review KDE Kwi
+updates and integrate them through tested pull requests.
 
 See [Development.md](Development.md) for building, testing, releases and maintenance.
 Local development and CI use the same [Makefile](Makefile).

@@ -14,7 +14,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(QT_MIN_VERSION 6.10)
 set(KF_MIN_VERSION 6.29)
-set(KWI_DISPLAY_NAME "Kwi")
+set(KWI_DISPLAY_NAME "Kwi Mac")
 set(KWI_APP_ID "org.kde.kwi")
 set(KWI_ORGANIZATION_DOMAIN "kde.org")
 set(KWI_EXECUTABLE "kwi")

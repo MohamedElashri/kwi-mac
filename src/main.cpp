@@ -5,10 +5,10 @@
 #include "Diagnostics_p.h"
 #include "WindowManager.h"
 #include "kwi-config.h"
-#include "kwi-version.h"
 #include "settings/TerminalPaletteModel.h"
 #include "settings/TerminalPresets.h"
 #include "settings/TerminalSettings.h"
+#include "ui/AppAboutData.h"
 #include "ui/AppShortcuts.h"
 
 #include <KAboutData>
@@ -108,17 +108,7 @@ int main(int argc, char **argv)
     Kwi::traceStage(QStringLiteral("application-icon"));
     KLocalizedString::setApplicationDomain("kwi");
 
-    KAboutData about{QStringLiteral(KWI_EXECUTABLE),
-                     i18n("Kwi"),
-                     QStringLiteral(KWI_VERSION_STRING),
-                     i18n("A modern and fast terminal"),
-                     KAboutLicense::GPL_V2,
-                     i18n("© 2026 Kwi contributors")};
-    about.addLicense(KAboutLicense::GPL_V3);
-    about.addLicenseTextFile(QStringLiteral(":/kwi/licenses/LicenseRef-KDE-Accepted-GPL.txt"));
-    about.addComponent(i18n("Ghostty"), {}, QStringLiteral(KWI_GHOSTTY_VERSION), QStringLiteral("https://ghostty.org"), KAboutLicense::MIT);
-    about.setTranslator(i18nc("NAME OF TRANSLATORS", "Your names"), i18nc("EMAIL OF TRANSLATORS", "Your emails"));
-    about.setBugAddress({});
+    KAboutData about{Kwi::applicationAboutData()};
     KAboutData::setApplicationData(about);
 
     QCommandLineParser parser{};

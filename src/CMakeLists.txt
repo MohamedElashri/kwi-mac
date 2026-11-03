@@ -62,6 +62,7 @@ qt_add_qml_module(kwi-ui
     QML_FILES ${kwi_qml_files}
     DEPENDENCIES org.kde.kwi.terminal
     SOURCES WindowManager.h WindowManager.cpp
+        ui/AppAboutData.cpp ui/AppAboutData.h
         ui/AppShortcuts.cpp ui/AppShortcuts.h
         ui/TextFormatting.cpp ui/TextFormatting.h
         ui/NativeTabClose.cpp ui/NativeTabClose.h
@@ -77,7 +78,7 @@ target_link_libraries(kwi-ui INTERFACE kwi-uiplugin)
 target_compile_definitions(kwi-ui PRIVATE TRANSLATION_DOMAIN="kwi")
 target_link_libraries(kwi-ui PUBLIC kwi-core Qt6::Quick
     PRIVATE Qt6::QuickControls2 Qt6::Widgets Qt6::DBus KF6::CoreAddons KF6::KIOGui KF6::I18nQml KF6::Kirigami KF6::KirigamiPlatform KF6::KirigamiActionCollection KF6::WindowSystem)
-target_include_directories(kwi-ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" PRIVATE settings ui)
+target_include_directories(kwi-ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" PRIVATE settings ui "${PROJECT_BINARY_DIR}")
 
 qt_add_executable(kwi main.cpp)
 if(APPLE)

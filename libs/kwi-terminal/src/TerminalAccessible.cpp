@@ -9,6 +9,7 @@
 #include <QAccessibleObject>
 #include <QKeySequence>
 #include <QPair>
+#include <QQmlContext>
 #include <QQmlEngine>
 #include <QQmlProperty>
 #include <QQuickRenderControl>
@@ -87,7 +88,14 @@ public:
 
     QAccessible::Role role() const override
     {
+#ifdef Q_OS_MACOS
+        // Qt's Cocoa bridge maps Terminal to AXGroup and omits its text value.
+        // EditableText exposes AXTextArea plus this interface's cursor/selection;
+        // state().readOnly still describes the actual terminal input policy.
+        return QAccessible::EditableText;
+#else
         return QAccessible::Terminal;
+#endif
     }
 
     QAccessible::State state() const override
@@ -127,7 +135,8 @@ public:
         }
 
         if (type == QAccessible::Name) {
-            const QString name{QQmlProperty::read(view(), QStringLiteral("Accessible.name"), qmlContext(view())).toString()};
+            auto *context = qmlContext(view());
+            const QString name{context && context->isValid() ? QQmlProperty::read(view(), QStringLiteral("Accessible.name"), context).toString() : QString{}};
 
             if (!name.isEmpty()) {
                 return name;
@@ -140,7 +149,9 @@ public:
         }
 
         if (type == QAccessible::Description) {
-            const QString description{QQmlProperty::read(view(), QStringLiteral("Accessible.description"), qmlContext(view())).toString()};
+            auto *context = qmlContext(view());
+            const QString description{context && context->isValid() ? QQmlProperty::read(view(), QStringLiteral("Accessible.description"), context).toString()
+                                                                    : QString{}};
 
             if (!description.isEmpty()) {
                 return description;
@@ -305,6 +316,11 @@ public:
             return 0;
         }
 
+#ifdef Q_OS_MACOS
+        if (!view()->m_keyboardSelectionMode && m_reviewCursor >= 0 && m_reviewRevision == view()->m_frameRevision)
+            return qMin(m_reviewCursor, characterCount());
+#endif
+
         const QPoint cursor{view()->m_keyboardSelectionMode ? view()->m_keyboardCursor : view()->glyphStart(view()->m_frame.cursor)};
 
         return cursor.y() < 0 ? 0 : offsetFor(content(), cursor);
@@ -321,6 +337,18 @@ public:
         if (view()->m_frame.rows.isEmpty()) {
             return;
         }
+
+#ifdef Q_OS_MACOS
+        if (!view()->m_keyboardSelectionMode) {
+            // Cocoa/VoiceOver can set AXSelectedTextRange just to track its
+            // review caret. Do not enter the user-invoked selection mode,
+            // which consumes typing. New terminal frames expire this offset.
+            m_reviewCursor = qBound(0, position, int(value.text.size()));
+            m_reviewRevision = view()->m_frameRevision;
+            view()->updateAccessibility();
+            return;
+        }
+#endif
 
         view()->setKeyboardSelectionMode(true);
         position = qBound(0, position, int(value.text.size()));
@@ -592,6 +620,10 @@ public:
     }
 
 private:
+#ifdef Q_OS_MACOS
+    int m_reviewCursor{-1};
+    quint64 m_reviewRevision{0};
+#endif
     mutable Content m_content;
     mutable quint64 m_contentRevision{0};
     mutable bool m_contentValid{false};

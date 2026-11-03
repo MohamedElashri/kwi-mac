@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Eike Hein <hein@kde.org>
 // SPDX-License-Identifier: LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-KDE-Accepted-LGPL
 
+#include "NativeLaunch_p.h"
 #include "NativeProcessInfo_p.h"
 #include "NativeProcess_p.h"
 #include "ProcessLaunch.h"
@@ -121,12 +122,16 @@ ProcessInfo localProcessInfo(KPtyDevice *device, qint64 leader, const QString &i
 {
     ProcessInfo info;
     info.directory = previous.directory;
+    info.busy = true; // An unavailable foreground observation is not an idle shell.
 
     if (!device || device->masterFd() < 0) {
         return info;
     }
 
     const qint64 foreground{tcgetpgrp(device->masterFd())};
+    if (foreground <= 0) {
+        return info;
+    }
     const qint64 target{foreground > 0 ? processInGroup(pid_t(foreground), leader > 0 ? pid_t(leader) : tcgetsid(device->masterFd())) : -1};
 
     for (const qint64 pid : {target, leader}) {
@@ -165,12 +170,13 @@ ProcessInfo localProcessInfo(KPtyDevice *device, qint64 leader, const QString &i
             const quint64 startTime{NativeProcessInfo::startTime(pid_t(target))};
 
             if (startTime) {
-                info.ssh = {target, startTime, executable, info.directory, {}};
-
-                if (previous.ssh.pid == target && previous.ssh.startTime == startTime && previous.ssh.executable == executable) {
-                    info.ssh.arguments = previous.ssh.arguments;
-                } else {
-                    info.ssh.arguments = processArguments(pid_t(target));
+                // exec/re-written argv can change without changing PID or birth
+                // time. Metadata refresh is already bounded/coalesced; reread
+                // SSH argv here and reject a lifetime race around that query.
+                const auto arguments = processArguments(pid_t(target));
+                if (!arguments.isEmpty() && NativeProcessInfo::startTime(pid_t(target)) == startTime
+                    && NativeProcessInfo::executable(pid_t(target)) == executable) {
+                    info.ssh = {target, startTime, executable, info.directory, arguments};
                 }
             }
         }
@@ -197,6 +203,11 @@ NativeProcess::NativeProcess()
 NativeProcess::~NativeProcess()
 {
     if (isRunning()) {
+#ifdef Q_OS_MACOS
+        // The started callback normally closes this parent-side slave. Teardown
+        // during Starting must do it too, before disconnecting that callback.
+        m_process->pty()->closeSlave();
+#endif
         signalSession(SIGKILL);
         m_process->disconnect(); // clazy:exclude=unused-result-check
         m_process->pty()->disconnect(); // clazy:exclude=unused-result-check
@@ -206,7 +217,18 @@ NativeProcess::~NativeProcess()
         // Retain the PTY master until QProcess reaps the child, without blocking the GUI.
         (void)QtConcurrent::run([process = std::move(m_process), master = m_master]() mutable {
             process->moveToThread(QThread::currentThread());
+#ifdef Q_OS_MACOS
+            if (process->state() == QProcess::Starting) {
+                process->waitForStarted(2000);
+                process->kill();
+            }
+            if (!process->waitForFinished(5000)) {
+                process->kill();
+                process->waitForFinished(1000);
+            }
+#else
             process->waitForFinished(-1);
+#endif
             process.reset();
         });
     }
@@ -247,13 +269,24 @@ bool NativeProcess::start(const TerminalLaunch &launch)
         return false;
     }
 
+    const QStringList arguments{nativeLaunchArguments(launch, executable)};
     m_initialExecutable = QFileInfo(executable).canonicalFilePath();
-    m_interactiveShell = registeredShell(m_initialExecutable, launch.inheritedEnvironment) && interactiveShellArguments(launch.arguments);
+    m_interactiveShell = registeredShell(m_initialExecutable, launch.inheritedEnvironment) && interactiveShellArguments(arguments);
+#ifdef Q_OS_MACOS
+    // /bin/sh is an Apple exec wrapper, not the shell image reported by libproc.
+    // Follow only its documented system selector; don't accept arbitrary execs as
+    // idle shells or weaken the executable/argv checks for other commands.
+    if (m_initialExecutable == QLatin1String("/bin/sh")) {
+        const QString selected{QFileInfo(QStringLiteral("/private/var/select/sh")).canonicalFilePath()};
+        const QStringList variants{QStringLiteral("/bin/bash"), QStringLiteral("/bin/dash"), QStringLiteral("/bin/zsh")};
+        m_initialExecutable = variants.contains(selected) ? selected : QStringLiteral("/bin/bash");
+    }
+#endif
     m_info.busy = !m_interactiveShell;
     m_process->setPtyChannels(KPtyProcess::AllChannels);
     m_process->setInputChannelMode(QProcess::ForwardedInputChannel);
     m_process->setUseUtmp(false);
-    m_process->setProgram(executable, launch.arguments);
+    m_process->setProgram(executable, arguments);
     m_process->setWorkingDirectory(m_info.directory);
     m_process->setUnixProcessParameters(QProcess::UnixProcessFlag::ResetSignalHandlers | QProcess::UnixProcessFlag::CloseFileDescriptors);
     m_process->setProcessEnvironment(environment);

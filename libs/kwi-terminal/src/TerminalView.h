@@ -50,6 +50,8 @@ class KWI_TERMINAL_EXPORT TerminalView : public QQuickItem
     Q_PROPERTY(bool copyOnSelect MEMBER m_copyOnSelect NOTIFY copyOnSelectChanged)
     Q_PROPERTY(bool requireCtrlForLinks READ requireCtrlForLinks WRITE setRequireCtrlForLinks NOTIFY requireCtrlForLinksChanged)
 
+    Q_PROPERTY(bool optionAsAlt READ optionAsAlt WRITE setOptionAsAlt NOTIFY optionAsAltChanged)
+
     Q_PROPERTY(QString selectedText READ selectedText NOTIFY selectionChanged)
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
     Q_PROPERTY(QString searchStatus READ searchStatus NOTIFY searchStatusChanged)
@@ -87,6 +89,9 @@ public:
     void setCursorBlinking(bool blinking);
     [[nodiscard]] bool requireCtrlForLinks() const;
     void setRequireCtrlForLinks(bool required);
+
+    [[nodiscard]] bool optionAsAlt() const;
+    void setOptionAsAlt(bool enabled);
 
     [[nodiscard]] QString selectedText() const;
     [[nodiscard]] bool hasSelection() const;
@@ -135,6 +140,7 @@ Q_SIGNALS:
     void confirmMultilinePasteChanged();
     void copyOnSelectChanged();
     void requireCtrlForLinksChanged();
+    void optionAsAltChanged();
     void selectionChanged();
     void searchStatusChanged();
     void scrollChanged();
@@ -174,6 +180,7 @@ protected:
 
 private:
     static constexpr qreal Padding{1};
+    bool m_optionAsAlt{false};
 
     void changeSession(Session *newSession);
     int wheelSteps(QPoint pixelDelta, QPoint angleDelta, int stepsPerNotch);
@@ -217,6 +224,7 @@ private:
 
     TerminalSearch *m_search;
     QRegion m_searchMatches;
+    bool m_resettingPreedit{false};
     QString m_preedit;
     QList<QInputMethodEvent::Attribute> m_preeditAttributes;
 
@@ -270,6 +278,7 @@ private:
     bool m_requireCtrlForLinks{true};
 
     bool m_keyboardSelectionMode{false};
+    bool m_traceMarkerSeen{false};
     QPoint m_keyboardCursor;
     QPointF m_selectionPointer;
 };

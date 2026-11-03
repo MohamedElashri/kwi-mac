@@ -3,6 +3,7 @@
 
 #include "WindowManager.h"
 #include "DesktopIntegration.h"
+#include "Diagnostics_p.h"
 #include "RunningCommandCheck.h"
 #include "Session.h"
 #include "SessionModel.h"
@@ -17,21 +18,29 @@
 #include <KLocalizedString>
 #include <KWindowEffects>
 #include <KWindowSystem>
+#include <QAccessible>
 #include <QCoreApplication>
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDebug>
 #include <QDir>
+#include <QEvent>
 #include <QEventLoopLocker>
 #include <QGuiApplication>
 #include <QMetaObject>
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
+#include <QSGRendererInterface>
+#include <QScreen>
 #include <QTimer>
 #include <QUuid>
 #include <QVariant>
 #include <algorithm>
 #include <utility>
+#ifdef Q_OS_MACOS
+#include "ui/MacWindowEffects.h"
+#include <dlfcn.h>
+#endif
 
 namespace Kwi
 {
@@ -61,7 +70,11 @@ public:
             return;
         }
 
+#ifdef Q_OS_MACOS
+        setMacBackgroundBlur(window, sharedSettings->backgroundBlur() && sharedSettings->backgroundOpacity() < 1);
+#else
         KWindowEffects::enableBlurBehind(window, sharedSettings->backgroundBlur() && sharedSettings->backgroundOpacity() < 1);
+#endif
     }
 
     TerminalSettings *const sharedSettings;
@@ -79,6 +92,30 @@ WindowManager::WindowManager(TerminalSettings *settings, TerminalPresets *preset
     , m_shortcuts{shortcuts}
     , m_palettes{palettes}
 {
+#ifdef Q_OS_MACOS
+    QCoreApplication::instance()->installEventFilter(this);
+#endif
+}
+
+bool WindowManager::eventFilter(QObject *watched, QEvent *event)
+{
+#ifdef Q_OS_MACOS
+    if (watched == QCoreApplication::instance()) {
+        if (event->type() == QEvent::Quit && !m_windows.isEmpty()) {
+            if (!m_quitting) {
+                requestQuit(m_windows.constLast(), false);
+            }
+            return true;
+        }
+        if (event->type() == QEvent::ApplicationStateChange && QGuiApplication::applicationState() == Qt::ApplicationActive && m_windows.isEmpty()
+            && !m_quitting) {
+            LaunchOptions options;
+            options.launch.contextDirectory = QDir::homePath();
+            launch(options);
+        }
+    }
+#endif
+    return QObject::eventFilter(watched, event);
 }
 
 WindowManager::~WindowManager()
@@ -258,7 +295,9 @@ void WindowManager::disposeWindow(WindowContext *context)
 
 WindowManager::WindowContext *WindowManager::createWindow()
 {
+    traceStage(QStringLiteral("before-window-context"));
     auto *context = new WindowContext{m_settings, m_presets, this};
+    traceStage(QStringLiteral("after-window-context"));
     KLocalization::setupLocalizedContext(context->engine);
     context->engine->setInitialProperties({
         {QStringLiteral("appSettings"), QVariant::fromValue(m_settings)},
@@ -272,6 +311,7 @@ WindowManager::WindowContext *WindowManager::createWindow()
     });
 
     context->engine->loadFromModule(QStringLiteral("org.kde.kwi"), QStringLiteral("Main"));
+    traceStage(QStringLiteral("after-qml-load"));
 
     if (context->engine->rootObjects().isEmpty()) {
         delete context;
@@ -286,6 +326,22 @@ WindowManager::WindowContext *WindowManager::createWindow()
 
         return nullptr;
     }
+
+#ifdef Q_OS_MACOS
+    configureMacPresentation(context->window);
+    const QPointer<QQuickWindow> surface{context->window};
+    connect(
+        context->window,
+        &QQuickWindow::sceneGraphInitialized,
+        context,
+        [surface] {
+            // Platform layers may be recreated with the scene graph. Keep
+            // AppKit access on the GUI thread and guard early teardown.
+            if (surface)
+                configureMacPresentation(surface);
+        },
+        Qt::QueuedConnection);
+#endif
 
     // HACK: Union assumes Quick tab bars are immutable (KDE bug 527467).
     // Look up Union's attached object at runtime to avoid a build dependency.
@@ -309,6 +365,46 @@ WindowManager::WindowContext *WindowManager::createWindow()
 
     context->desktop->setWindow(context->window);
     context->updateBlur();
+    if (traceEnabled()) {
+        connect(
+            context->window,
+            &QQuickWindow::sceneGraphInitialized,
+            context->window,
+            [window = context->window] {
+                trace(QStringLiteral("graphics"), {{QStringLiteral("api"), int(window->rendererInterface()->graphicsApi())}});
+            },
+            Qt::DirectConnection);
+        const auto logWindow = [window = context->window] {
+            trace(QStringLiteral("window"),
+                  {{QStringLiteral("width"), window->width()},
+                   {QStringLiteral("height"), window->height()},
+                   {QStringLiteral("dpr"), window->devicePixelRatio()},
+                   {QStringLiteral("refresh_hz"), window->screen() ? window->screen()->refreshRate() : 0},
+                   {QStringLiteral("accessibility_active"), QAccessible::isActive()}});
+        };
+        logWindow();
+        connect(context->window, &QWindow::widthChanged, context, logWindow);
+        connect(context->window, &QWindow::heightChanged, context, logWindow);
+        connect(context->window, &QWindow::screenChanged, context, logWindow);
+        connect(
+            context->window,
+            &QQuickWindow::frameSwapped,
+            context->window,
+            [] {
+                QJsonObject fields;
+#ifdef Q_OS_MACOS
+                // Optional test instrumentation supplies the current drawable
+                // ID. Keep it out of normal builds' execution path and avoid
+                // replacing Qt's message handler just to correlate frames.
+                using DrawableSequence = quint64 (*)();
+                static auto sequence = reinterpret_cast<DrawableSequence>(dlsym(RTLD_DEFAULT, "kwi_current_drawable_sequence"));
+                if (sequence)
+                    fields.insert(QStringLiteral("drawable_sequence"), qint64(sequence()));
+#endif
+                trace(QStringLiteral("frame-swapped"), std::move(fields));
+            },
+            Qt::DirectConnection);
+    }
 
     connect(context->window, &QQuickWindow::sceneGraphError, context, [](QQuickWindow::SceneGraphError, const QString &message) {
         qCritical().noquote() << i18n("Could not initialize terminal graphics: %1", message);
@@ -324,6 +420,13 @@ WindowManager::WindowContext *WindowManager::createWindow()
 
     connect(context->window, &QWindow::visibleChanged, context, [this, context](bool visible) {
         if (!visible && context->sessions->count() == 0) {
+            disposeWindow(context);
+        }
+    });
+    connect(context->sessions, &SessionModel::countChanged, context, [this, context] {
+        // A window can already be hidden when its final tab closes. In that
+        // order no further visibleChanged signal arrives to dispose it.
+        if (context->sessions->count() == 0 && (!context->window || !context->window->isVisible())) {
             disposeWindow(context);
         }
     });
@@ -360,6 +463,11 @@ WindowManager::WindowContext *WindowManager::createWindow()
     connect(context, &QObject::destroyed, this, [this, context] {
         m_windows.removeAll(context);
         updateProgress();
+#ifdef Q_OS_MACOS
+        if (m_quitting && m_windows.isEmpty()) {
+            QCoreApplication::quit();
+        }
+#endif
     });
 
     m_windows.append(context);
@@ -369,6 +477,7 @@ WindowManager::WindowContext *WindowManager::createWindow()
 
 void WindowManager::updateProgress()
 {
+#ifndef Q_OS_MACOS
     // Report the last active window, falling back to a surviving window after it closes.
     const auto *model = sessions(m_activeWindow);
 
@@ -412,6 +521,7 @@ void WindowManager::updateProgress()
         QDBusMessage::createSignal(QStringLiteral("/org/kde/kwi/UnityLauncher"), QStringLiteral("com.canonical.Unity.LauncherEntry"), QStringLiteral("Update"));
     message.setArguments({launcherId, properties});
     QDBusConnection::sessionBus().send(message);
+#endif
 }
 
 QList<QPointer<TerminalSession>> WindowManager::sessionSnapshot() const
@@ -457,6 +567,7 @@ void WindowManager::requestQuit(WindowContext *context, bool force)
         return;
     }
 
+    m_quitting = true;
     for (auto *candidate : std::as_const(m_windows)) {
         candidate->sessions->closeAll(true);
     }
@@ -484,8 +595,13 @@ void WindowManager::activate(WindowContext *context, bool fullscreen)
     context->window->setVisible(true);
     m_activeWindow = context->window;
     updateProgress();
+#ifdef Q_OS_MACOS
+    context->window->raise();
+    context->window->requestActivate();
+#else
     KWindowSystem::updateStartupId(context->window);
     KWindowSystem::activateWindow(context->window);
+#endif
 }
 
 QQuickWindow *WindowManager::launch(const LaunchOptions &options)

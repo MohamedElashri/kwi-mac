@@ -62,6 +62,7 @@ Q_SIGNALS:
     void draggedSessionChanged();
 
 private:
+    bool eventFilter(QObject *watched, QEvent *event) override;
     class WindowContext;
     [[nodiscard]] WindowContext *createWindow();
     [[nodiscard]] WindowContext *contextForSessions(const SessionModel *sessionModel) const;
@@ -95,5 +96,6 @@ private:
 
     quint64 m_quitRequestSerial{0};
     QPointer<SessionModel> m_quitRequester{};
+    bool m_quitting{false};
 };
 }

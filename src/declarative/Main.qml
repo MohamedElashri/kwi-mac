@@ -43,6 +43,58 @@ Kirigami.ApplicationWindow {
 
     background: Item {}
 
+    // Cocoa reserves application-menu equivalents such as Command-comma.
+    // Give them actual native menu items backed by the same shared actions.
+    menuBar: Qt.platform.os === "osx" ? macMenuBar.createObject(root) : null
+
+    Controls.Action {
+        id: closeSettingsAction
+        text: KI18n.i18nc("@action:menu", "Close Settings")
+        shortcut: StandardKey.Close
+        enabled: !!settingsView.configViewItem
+        onTriggered: settingsView.configViewItem.close()
+    }
+
+    Component {
+        id: macMenuBar
+        Controls.MenuBar {
+            objectName: "nativeMenuBar"
+            delegate: Controls.MenuBarItem { Kirigami.MnemonicData.enabled: false }
+            Controls.Menu {
+                title: KI18n.i18nc("@title:menu", "File")
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: newWindowAction }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: newTabAction }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: settingsView.configViewItem ? closeSettingsAction : closeTabAction }
+                Controls.MenuSeparator {}
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: settingsAction; text: KI18n.i18nc("@action:menu", "Settings…") }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: quitAction }
+            }
+            Controls.Menu {
+                title: KI18n.i18nc("@title:menu", "Edit")
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: copyAction }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: pasteAction }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: selectAllAction }
+                Controls.MenuSeparator {}
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: findAction }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: findNextAction }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: findPreviousAction }
+            }
+            Controls.Menu {
+                title: KI18n.i18nc("@title:menu", "View")
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: fullscreenAction }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: zoomInAction }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: zoomOutAction }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: resetZoomAction }
+            }
+            Controls.Menu {
+                title: KI18n.i18nc("@title:menu", "Window")
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: nextTabAction }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: previousTabAction }
+                Controls.MenuItem { Kirigami.MnemonicData.enabled: false; action: detachTabAction }
+            }
+        }
+    }
+
     title: root.currentSession ? (root.appSettings.windowTitleFromApplication ? root.currentSession.applicationTitle : root.currentSession.title) : ""
 
     property bool closingAllowed: false
@@ -667,11 +719,55 @@ Kirigami.ApplicationWindow {
         }
     }
 
+    Component {
+        id: macSettingsMenuBar
+        Controls.MenuBar {
+            delegate: Controls.MenuBarItem { Kirigami.MnemonicData.enabled: false }
+            Controls.Menu {
+                title: KI18n.i18nc("@title:menu", "File")
+                Controls.MenuItem {
+                    Kirigami.MnemonicData.enabled: false
+                    action: closeSettingsAction
+                }
+            }
+        }
+    }
+
+    Component {
+        id: macSettingsFooter
+
+        Controls.ToolBar {
+            contentItem: RowLayout {
+                Item { Layout.fillWidth: true }
+                Controls.Button {
+                    objectName: "closeSettingsButton"
+                    text: KI18n.i18nc("@action:button", "Close")
+                    onClicked: settingsView.configViewItem.close()
+                }
+            }
+
+            Shortcut {
+                sequences: [StandardKey.Close]
+                onActivated: settingsView.configViewItem.close()
+            }
+        }
+    }
+
     Settings.ConfigurationView {
         id: settingsView
 
         objectName: "settingsView"
         window: root
+        // Cocoa presents the upstream window-modal config window as a sheet,
+        // without a title-bar close button. Give that host an explicit exit.
+        onConfigViewItemChanged: {
+            if (Qt.platform.os === "osx" && configViewItem) {
+                configViewItem.footer = macSettingsFooter.createObject(configViewItem);
+                // A modal sheet blocks its parent's native menu bar. Supply a
+                // Close action in the sheet's own bar for native Command-W.
+                configViewItem.menuBar = macSettingsMenuBar.createObject(configViewItem);
+            }
+        }
         modules: [
             Settings.ConfigurationModule {
                 moduleId: "appearance"
@@ -1696,7 +1792,9 @@ Kirigami.ApplicationWindow {
 
         objectName: "aboutDialog"
         title: KI18n.i18nc("@title:window", "About Kwi")
-        pageFactory: () => Qt.createComponent("org.kde.kirigamiaddons.formcard", "AboutPage")
+        pageFactory: () => Qt.platform.os === "osx"
+            ? Qt.createComponent("org.kde.kwi", "KwiAboutPage")
+            : Qt.createComponent("org.kde.kirigamiaddons.formcard", "AboutPage")
         initialProperties: ({ objectName: "aboutPage", getInvolvedUrl: "", donateUrl: "" })
     }
 }

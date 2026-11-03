@@ -1,6 +1,7 @@
 /build*/
-/*.md
-!/README.md
+/plan.md
+/.DS_Store
 /.clang-format
 *.user
 *.kate-swp
+__pycache__/

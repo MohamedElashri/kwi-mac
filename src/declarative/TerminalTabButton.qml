@@ -21,6 +21,7 @@ Controls.TabButton {
     property bool showStatusIcons: true
     property bool draggable: false
     property bool dragging: false
+    property int tabPosition: Controls.TabBar.Header
     readonly property bool dragGestureActive: tabDrag.active
     readonly property string monitoringDescription: session.monitorActivity && session.monitorSilence ? KI18n.i18nc("@info:tooltip", "Monitoring activity and silence") : session.monitorActivity ? KI18n.i18nc("@info:tooltip", "Monitoring activity") : session.monitorSilence ? KI18n.i18nc("@info:tooltip", "Monitoring silence") : ""
     readonly property bool hasProgress: !session.finished && session.progressState !== Terminal.Session.None
@@ -65,6 +66,47 @@ Controls.TabButton {
     Accessible.name: session.attention ? KI18n.i18nc("@info:accessibility", "%1, needs attention", session.title) : session.title
     Accessible.description: progressDescription
     Accessible.selected: checked
+
+    // The desktop style delegates to QMacStyle on macOS, whose segmented
+    // buttons do not join the terminal frame. Keep the Linux desktop tab
+    // silhouette instead, using the same live Kirigami palette.
+    Component.onCompleted: {
+        if (Qt.platform.os === "osx")
+            background = desktopTabBackground.createObject(control);
+    }
+
+    Component {
+        id: desktopTabBackground
+
+        Rectangle {
+            implicitWidth: Kirigami.Units.gridUnit * 8
+            implicitHeight: Kirigami.Units.gridUnit * 2
+            Kirigami.Theme.colorSet: Kirigami.Theme.Window
+            Kirigami.Theme.inherit: false
+
+            readonly property bool footer: control.tabPosition === Controls.TabBar.Footer
+            readonly property real cornerRadius: Kirigami.Units.smallSpacing
+
+            topLeftRadius: footer ? 0 : cornerRadius
+            topRightRadius: footer ? 0 : cornerRadius
+            bottomLeftRadius: footer ? cornerRadius : 0
+            bottomRightRadius: footer ? cornerRadius : 0
+            color: control.checked ? Kirigami.Theme.backgroundColor : Qt.tint(Kirigami.Theme.backgroundColor, Qt.alpha(control.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.textColor, control.hovered ? 0.12 : 0.06))
+            border.width: control.checked ? 1 : 0
+            border.color: control.visualFocus ? Kirigami.Theme.focusColor : Qt.alpha(Kirigami.Theme.textColor, 0.25)
+
+            // Open the selected tab toward the terminal, just like the
+            // toolbar separator's selected-tab gap, including bottom tabs.
+            Rectangle {
+                visible: control.checked
+                x: 1
+                y: parent.footer ? 0 : parent.height - height
+                width: parent.width - 2
+                height: 1
+                color: parent.color
+            }
+        }
+    }
 
     Keys.onPressed: event => {
         if (event.key === Qt.Key_Left || event.key === Qt.Key_Right || event.key === Qt.Key_Home || event.key === Qt.Key_End) {

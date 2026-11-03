@@ -7,6 +7,7 @@
 
 #include <QApplication>
 #include <QEvent>
+#include <QIcon>
 #include <QPainter>
 #include <QPalette>
 #include <QQuickWindow>
@@ -47,7 +48,12 @@ void NativeTabClose::updateStyle()
 
     QStyleOption option;
     option.palette = m_theme->palette();
+#ifdef Q_OS_MACOS
+    const int size{style->pixelMetric(QStyle::PM_SmallIconSize, &option)};
+    setImplicitSize(size, size);
+#else
     setImplicitSize(style->pixelMetric(QStyle::PM_TabCloseIndicatorWidth, &option), style->pixelMetric(QStyle::PM_TabCloseIndicatorHeight, &option));
+#endif
 }
 
 bool NativeTabClose::event(QEvent *incomingEvent)
@@ -111,7 +117,25 @@ void NativeTabClose::updatePolish()
 
     // Paint on the GUI thread; updatePaintNode() uploads the image on the render thread.
     QPainter painter{&m_image};
+#ifdef Q_OS_MACOS
+    // Match the desktop close indicator without QMacStyle's round title-bar
+    // icon (its tab primitive also requires a QWidget that Quick cannot supply).
+    painter.setRenderHint(QPainter::Antialiasing);
+    if (m_hovered || m_pressed) {
+        auto background = option.palette.color(QPalette::Highlight);
+        background.setAlphaF(m_pressed ? 0.25 : 0.12);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(background);
+        painter.drawRoundedRect(boundingRect(), 2, 2);
+    }
+    painter.setPen(QPen{option.palette.color(QPalette::WindowText), 1.5, Qt::SolidLine, Qt::RoundCap});
+    const QPointF center{boundingRect().center()};
+    const qreal radius{qMin(width(), height()) / 4};
+    painter.drawLine(center + QPointF{-radius, -radius}, center + QPointF{radius, radius});
+    painter.drawLine(center + QPointF{-radius, radius}, center + QPointF{radius, -radius});
+#else
     m_style->drawPrimitive(QStyle::PE_IndicatorTabClose, &option, &painter);
+#endif
     painter.end();
     update();
 }

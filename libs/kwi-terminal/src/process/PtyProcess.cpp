@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-KDE-Accepted-LGPL
 
 #include "PtyProcess.h"
+#include "Diagnostics_p.h"
 #include "HostProcess_p.h"
 #include "NativeProcess_p.h"
 #include "ProcessLaunch.h"
@@ -9,13 +10,17 @@
 #include <KLocalizedString>
 #include <KPtyDevice>
 #include <KSandbox>
+#include <QElapsedTimer>
 #include <QPointer>
+#include <QSocketNotifier>
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <climits>
 #include <cstring>
+#include <poll.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 #include <utility>
 
 namespace
@@ -44,6 +49,7 @@ PtyProcess::PtyProcess(QObject *parent)
 
 PtyProcess::~PtyProcess()
 {
+    m_readNotifier.reset();
     if (m_process) {
         m_process->disconnect(this); // clazy:exclude=unused-result-check
 
@@ -60,7 +66,7 @@ KPtyDevice *PtyProcess::device() const
     return m_process ? m_process->device() : nullptr;
 }
 
-bool PtyProcess::initialize(std::unique_ptr<ProcessController> controller, int masterFd, int columns, int rows)
+bool PtyProcess::initialize(std::unique_ptr<ProcessController> controller, int masterFd, int columns, int rows, [[maybe_unused]] bool directRead)
 {
     if (isRunning() || m_exitPending || m_refreshPending) {
         Q_EMIT errorOccurred(i18n("A terminal process is already running."));
@@ -69,6 +75,7 @@ bool PtyProcess::initialize(std::unique_ptr<ProcessController> controller, int m
     }
 
     ++m_runGeneration;
+    m_readNotifier.reset();
     m_process = std::move(controller);
     m_metadataTimer.stop();
     m_ioGeneration = 0;
@@ -91,10 +98,23 @@ bool PtyProcess::initialize(std::unique_ptr<ProcessController> controller, int m
         return false;
     }
 
-    connect(device(), &QIODevice::readyRead, this, &PtyProcess::readOutput);
+#ifdef Q_OS_MACOS
+    if (directRead) {
+        // Own the read notification for ordinary Darwin child sessions. Mixing
+        // direct reads with KPty's reader can turn a drained packet into a false
+        // EOF. KPty still owns the descriptor, writes and terminal operations.
+        device()->setSuspended(true);
+        m_readNotifier = std::make_unique<QSocketNotifier>(device()->masterFd(), QSocketNotifier::Read);
+        connect(m_readNotifier.get(), &QSocketNotifier::activated, this, &PtyProcess::readOutput);
+    } else
+#endif
+    {
+        connect(device(), &QIODevice::readyRead, this, &PtyProcess::readOutput);
+    }
     connect(device(), &QIODevice::bytesWritten, this, &PtyProcess::flushInput);
     connect(device(), &KPtyDevice::readEof, this, &PtyProcess::readOutput);
     connect(m_process.get(), &ProcessController::transportClosed, this, [this] {
+        m_readNotifier.reset();
         m_pendingInput.clear();
         m_inputOffset = 0;
     });
@@ -138,7 +158,7 @@ bool PtyProcess::start(const TerminalLaunch &launch, int columns, int rows, int 
         controller = std::make_unique<NativeProcess>();
     }
 
-    if (!initialize(std::move(controller), masterFd, columns, rows)) {
+    if (!initialize(std::move(controller), masterFd, columns, rows, masterFd < 0)) {
         return false;
     }
 
@@ -206,7 +226,45 @@ void PtyProcess::readOutput()
     }
 
     auto *ptyDevice = device();
-    const auto output = ptyDevice->isOpen() ? ptyDevice->read(readBudget) : QByteArray();
+    QByteArray output = ptyDevice->isOpen() ? ptyDevice->read(readBudget) : QByteArray();
+    bool readAgain{false};
+    bool readEnded{false};
+    int readFailure{0};
+#ifdef Q_OS_MACOS
+    // KPty opens the master nonblocking. Only our notifier reads ordinary Mac
+    // child sessions; attached descriptors retain KPty's original EOF handling.
+    if (m_readNotifier && ptyDevice->isOpen() && ptyDevice->masterFd() >= 0) {
+        m_readNotifier->setEnabled(false);
+        QElapsedTimer intake;
+        intake.start();
+        while (ptyDevice->bytesAvailable() == 0 && output.size() < readBudget && intake.nsecsElapsed() < 2'000'000) {
+            char packet[64 * 1024];
+            const auto count = ::read(ptyDevice->masterFd(), packet, std::min<qint64>(sizeof(packet), readBudget - output.size()));
+            if (count > 0)
+                output.append(packet, count);
+            else if (count < 0 && errno == EINTR)
+                continue;
+            else if (count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) && output.size() < 32 * 1024 && intake.nsecsElapsed() < 1'000'000) {
+                // Darwin's small tty packets wake a writer between reads. A
+                // bounded poll lets it supply the next packet without a Cocoa
+                // round trip. Never wait more than 1 ms or exceed the 2 ms
+                // intake budget; idle sessions have no polling timer. Once a
+                // useful batch is ready, yield it instead of delaying delivery
+                // for another packet. The 256 KiB and 2 ms bounds still apply.
+                pollfd next{ptyDevice->masterFd(), POLLIN, 0};
+                if (::poll(&next, 1, 1) > 0)
+                    continue;
+                break;
+            } else {
+                readEnded = count == 0 || (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK);
+                if (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EIO)
+                    readFailure = errno;
+                break;
+            }
+        }
+        readAgain = !readEnded && (output.size() >= readBudget || intake.nsecsElapsed() >= 2'000'000);
+    }
+#endif
     const QPointer<PtyProcess> guard{this};
     const auto generation = m_runGeneration;
 
@@ -220,9 +278,17 @@ void PtyProcess::readOutput()
         }
     }
 
-    if (ptyDevice->masterFd() >= 0 && ptyDevice->bytesAvailable() > 0) {
+    if (readFailure) {
+        Q_EMIT errorOccurred(i18n("Could not read from the terminal: %1", systemError(readFailure)));
+        if (guard != nullptr && generation == m_runGeneration)
+            close();
+        return;
+    }
+
+    if (ptyDevice->masterFd() >= 0 && (readAgain || ptyDevice->bytesAvailable() > 0)) {
         // Suspend intake while draining buffered output to give the GUI time to process input.
-        ptyDevice->setSuspended(true);
+        if (!m_readNotifier)
+            ptyDevice->setSuspended(true);
 
         if (!m_readScheduled) {
             m_readScheduled = true;
@@ -234,7 +300,8 @@ void PtyProcess::readOutput()
                 m_readScheduled = false;
 
                 if (device() && device()->masterFd() >= 0) {
-                    device()->setSuspended(false);
+                    if (!m_readNotifier)
+                        device()->setSuspended(false);
                     readOutput();
                 }
             });
@@ -243,12 +310,20 @@ void PtyProcess::readOutput()
         return;
     }
 
+    if (m_readNotifier && !readEnded)
+        m_readNotifier->setEnabled(true);
+
     if (m_exitPending) {
         // QProcess::finished can arrive before KPtyDevice's final readyRead.
         int available{0};
 
         if (ptyDevice->masterFd() >= 0 && ioctl(ptyDevice->masterFd(), FIONREAD, &available) == 0 && available > 0) {
-            ptyDevice->setSuspended(false);
+            if (traceEnabled())
+                trace(QStringLiteral("tail-pending"), {{QStringLiteral("bytes"), available}});
+            if (m_readNotifier)
+                m_readNotifier->setEnabled(true);
+            else
+                ptyDevice->setSuspended(false);
 
             return;
         }
@@ -293,6 +368,8 @@ void PtyProcess::closeMaster()
 
 void PtyProcess::processFinished(int exitCode)
 {
+    if (traceEnabled())
+        trace(QStringLiteral("process-finished"), {{QStringLiteral("exit_code"), exitCode}});
     m_metadataTimer.stop();
     m_exitCode = exitCode;
     m_exitPending = true;
@@ -309,6 +386,8 @@ void PtyProcess::finishExit()
     m_exitEmitted = true;
     m_metadataTimer.stop();
 
+    if (traceEnabled())
+        trace(QStringLiteral("process-drained"), {{QStringLiteral("exit_code"), m_exitCode}});
     Q_EMIT exited(m_exitCode);
 }
 

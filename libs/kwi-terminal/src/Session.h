@@ -240,6 +240,8 @@ private:
     qreal m_zoomOffset{0};
     GhosttyQt::Progress m_progress;
     int m_columns{80};
+    QByteArray m_traceMarker;
+    QByteArray m_traceMarkerTail;
     int m_rows{24};
     QSize m_cellPixels;
 };

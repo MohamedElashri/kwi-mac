@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 Kwi contributors
+# SPDX-License-Identifier: CC0-1.0
+name: Track upstream Kwi
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Compare against KDE master without modifying the port
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote add upstream https://invent.kde.org/utilities/kwi.git
+          git fetch --no-tags upstream master
+          base=$(git merge-base HEAD FETCH_HEAD)
+          count=$(git rev-list --count HEAD..FETCH_HEAD)
+          mkdir -p upstream-report
+          git log --format='%h %s' HEAD..FETCH_HEAD > upstream-report/commits.txt
+          git diff --stat "$base" FETCH_HEAD > upstream-report/changes.txt
+          {
+            echo '## KDE Kwi upstream'
+            echo "Unmerged upstream commits: $count"
+            echo "Last common commit: $base"
+            echo '```text'
+            cat upstream-report/commits.txt
+            echo '```'
+            echo 'Review and merge upstream/master on a sync branch; this workflow does not merge automatically.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: upstream-report
+          path: upstream-report/
+          retention-days: 30

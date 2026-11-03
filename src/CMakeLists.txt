@@ -23,6 +23,10 @@ target_compile_definitions(kwi-core PRIVATE TRANSLATION_DOMAIN="kwi")
 
 set_target_properties(kwi-core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+if(APPLE)
+    target_link_libraries(kwi-core PRIVATE "-framework CoreText")
+endif()
+
 add_library(kwi-ui STATIC)
 
 set(kwi_qml_files
@@ -31,7 +35,7 @@ set(kwi_qml_files
     declarative/ColorSchemeEditor.qml declarative/TerminalSettings.qml declarative/BehaviorSettings.qml
     declarative/KeyboardSettings.qml declarative/TerminalPane.qml declarative/TerminalSearchBar.qml
     declarative/PresetsSettings.qml declarative/PromptDialogFooter.qml
-    declarative/WebShortcutMenu.qml declarative/TabCloseButton.qml
+    declarative/WebShortcutMenu.qml declarative/TabCloseButton.qml declarative/KwiAboutPage.qml
     declarative/+org.kde.desktop/TabCloseButton.qml
     declarative/+org.kde.union/TabCloseButton.qml)
 
@@ -76,6 +80,20 @@ target_link_libraries(kwi-ui PUBLIC kwi-core Qt6::Quick
 target_include_directories(kwi-ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" PRIVATE settings ui)
 
 qt_add_executable(kwi main.cpp)
+if(APPLE)
+    target_sources(kwi PRIVATE LocalActivation.cpp LocalActivation.h)
+    target_link_libraries(kwi PRIVATE Qt6::Network KF6::BreezeIcons KF6::IconThemes)
+    set_target_properties(kwi PROPERTIES
+        MACOSX_BUNDLE_GUI_IDENTIFIER "${KWI_APP_ID}"
+        MACOSX_BUNDLE_BUNDLE_NAME "${KWI_DISPLAY_NAME}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_COPYRIGHT "2026 Kwi contributors")
+    include(ECMAddAppIcon)
+    configure_file("${PROJECT_SOURCE_DIR}/logo.png" "256-kwi.png" COPYONLY)
+    ecm_add_app_icon(kwi ICONS "${CMAKE_CURRENT_BINARY_DIR}/256-kwi.png")
+    set_target_properties(kwi PROPERTIES MACOSX_BUNDLE_ICON_FILE "kwi.icns")
+endif()
 target_link_libraries(kwi PRIVATE kwi-ui Qt6::Widgets KirigamiApp KF6::CoreAddons
     KF6::DBusAddons KF6::ConfigQml KF6::I18nQml KF6::Kirigami KF6::WindowSystem)
 target_include_directories(kwi PRIVATE "${PROJECT_BINARY_DIR}")
@@ -100,3 +118,8 @@ if(BUILD_KPART)
 endif()
 
 install(TARGETS kwi ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+
+if(APPLE)
+    target_sources(kwi-ui PRIVATE ui/MacWindowEffects.mm ui/MacWindowEffects.h)
+    target_link_libraries(kwi-ui PRIVATE Qt6::GuiPrivate "-framework AppKit" "-framework QuartzCore")
+endif()

@@ -115,6 +115,11 @@ RowLayout {
             root.view.snapMode: ListView.NoSnap
         }
 
+        Binding {
+            when: Qt.platform.os === "osx"
+            root.view.spacing: 0
+        }
+
         // Guard the desktop style's height calculation while the Repeater is empty.
         contentItem.implicitHeight: tabBar.count > 0 && tabBar.itemAt(0) ? tabBar.itemAt(0).implicitHeight : 0
 
@@ -183,6 +188,7 @@ RowLayout {
 
                 width: tabBar.tabWidth
                 height: tabBar.availableHeight
+                tabPosition: root.position
                 showStatusIcons: root.showStatusIcons
                 draggable: root.dragController !== null
                 dragging: root.dragController !== null && root.dragController.draggedSession === session

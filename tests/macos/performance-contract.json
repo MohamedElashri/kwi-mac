@@ -1,0 +1,125 @@
+{
+  "frozen_utc": "2026-11-02T01:28:54.710241+00:00",
+  "host": "MAC-ARM-M1-01, Apple M1, 16 GiB, macOS 27.2, 2x/60Hz",
+  "scope": "This Mac only; no Linux/FreeBSD/KPart/hosted CI acceptance.",
+  "viewports": [
+    [
+      120,
+      40
+    ],
+    [
+      220,
+      60
+    ]
+  ],
+  "planned_large_viewport_deviation": "240x80 clamps to 239x65 in native Ghostty on the 1440x900 logical display; verified common 220x60 chosen before optimization. Timing thresholds unchanged.",
+  "font": "Menlo 10 pt (12x23 physical-pixel cell on this 2x display); independent Kwi/Ghostty padding",
+  "history_lines": 100000,
+  "opacity_cases": [
+    1,
+    0.8
+  ],
+  "repetitions": {
+    "warmups": 1,
+    "measured": 5
+  },
+  "parser_absolute_floor_mib_per_second": 30,
+  "floor_rationale": "Half the slowest native Ghostty median across the four frozen cases, rounded to the nearest 5 MiB/s; uniform floor plus >=90% of matching preserved Kwi baseline. A parser floor is not rendered throughput acceptance.",
+  "relative_throughput_floor": 0.9,
+  "warm_terminal_frame_ms_max": 1500,
+  "cold_terminal_frame_ms_max": 2000,
+  "input_to_response_p95_ms": 50,
+  "input_to_response_p99_ms": 100,
+  "frame_interval_p95_ms": 20.833333333333336,
+  "frame_interval_p99_ms": 33.333333333333336,
+  "idle_seconds": 60,
+  "idle_cpu_percent_one_core_max": 1,
+  "memory": "100 warm-up cycles, then >=5 equal batches of 100 fixed-content tab cycles; record settled footprint and RSS. No reproducible monotonic retained-memory slope.",
+  "instrumentation": "Compare untraced DSR and coarse/full tracing; <=5% coarse median throughput budget. Clock is Darwin MONOTONIC_RAW.",
+  "presentation": "DSR, Qt event echo and frame callbacks are diagnostic intervals. Actual input-to-pixel presentation must remain unverified if not measured.",
+  "baseline_results": [
+    {
+      "terminal": "kwi",
+      "grid": "120x40",
+      "dataset": "ascii",
+      "median_parser_mib_per_second": 21.69116433721779,
+      "result": "build-macos/phase2a/baseline-kwi-120x40-ascii/summary.json",
+      "sha256": "4df78e61244ad7d932a0ee1a1f31b721aa6a82e87f84b78778a8a2ffa6af5463"
+    },
+    {
+      "terminal": "kwi",
+      "grid": "120x40",
+      "dataset": "ansi",
+      "median_parser_mib_per_second": 22.109727468244472,
+      "result": "build-macos/phase2a/baseline-kwi-120x40-ansi/summary.json",
+      "sha256": "4cdf177bd6f0b3c6aefff80e22cb91e42e77cf6799fbde31f4319fbd3f6e9452"
+    },
+    {
+      "terminal": "kwi",
+      "grid": "220x60",
+      "dataset": "ascii",
+      "median_parser_mib_per_second": 20.789632193273768,
+      "result": "build-macos/phase2a/baseline-kwi-220x60-ascii/summary.json",
+      "sha256": "e9fc11796a42239eca1543fa3a86f6f02aadf0eacfb6e4eeb0fe3c239efbb79d"
+    },
+    {
+      "terminal": "kwi",
+      "grid": "220x60",
+      "dataset": "ansi",
+      "median_parser_mib_per_second": 21.980318204196628,
+      "result": "build-macos/phase2a/baseline-kwi-220x60-ansi/summary.json",
+      "sha256": "4daad58937c0f183470fac263a5e59c54e0a8fc43cc1bd39e6fc4b1c030facc4"
+    },
+    {
+      "terminal": "ghostty",
+      "grid": "120x40",
+      "dataset": "ascii",
+      "median_parser_mib_per_second": 70.57345251691247,
+      "result": "build-macos/phase2a/baseline-ghostty-120x40-ascii/summary.json",
+      "sha256": "2a1a9cc5538df542619ee6bed0adcac0a9af8f1eafe76425c82837007e9e529c"
+    },
+    {
+      "terminal": "ghostty",
+      "grid": "120x40",
+      "dataset": "ansi",
+      "median_parser_mib_per_second": 68.23833105453559,
+      "result": "build-macos/phase2a/baseline-ghostty-120x40-ansi/summary.json",
+      "sha256": "d452a98c6174de7025677dad78a8e8560d5abcd26ffd3a1532a95edb4768deb2"
+    },
+    {
+      "terminal": "ghostty",
+      "grid": "220x60",
+      "dataset": "ascii",
+      "median_parser_mib_per_second": 59.48900109950081,
+      "result": "build-macos/phase2a/baseline-ghostty-220x60-ascii/summary.json",
+      "sha256": "85f2c4e132cbd539745f938e151c3c80bfdc5dcf8e876de8f9bc4a827a967625"
+    },
+    {
+      "terminal": "ghostty",
+      "grid": "220x60",
+      "dataset": "ansi",
+      "median_parser_mib_per_second": 63.9988293974115,
+      "result": "build-macos/phase2a/baseline-ghostty-220x60-ansi/summary.json",
+      "sha256": "15a8719e8ecf1f8524d9b16497612229d161716bc44dfa3464cc6386d1ada435"
+    }
+  ],
+  "revision": 2,
+  "revision_history": [
+    {
+      "date": "2026-11-02",
+      "requested_by": "user",
+      "instruction": "Lets make the target for phase 2A gate 1.5 seconds so finish it quickly and record that (don't do new measurnment, just the goal changes).",
+      "field": "warm_terminal_frame_ms_max",
+      "previous_value": 1000,
+      "new_value": 1500,
+      "changed_after_measurements": true,
+      "new_measurements_performed": false,
+      "reason": "User accepts 1.5 seconds for the local Apple Silicon feasibility gate and requests closure using existing evidence.",
+      "original_contract": "docs/macos-phase2a/contract-original.json",
+      "original_contract_sha256": "8438c047abcf3418721a1affe25cb90ba6ccccf1e61126a3760f97dc3423a0a0",
+      "acceptance_scope": "Close Phase 2A local feasibility using the existing measured series. Cold-start and full independent long-series replication remain unverified and move to Phase 4/6 final validation; they are not recorded as passes.",
+      "other_numeric_targets": "Unchanged, including the 2-second cold-start target and five independent repetitions for final validation."
+    }
+  ],
+  "phase2a_status": "COMPLETE: accepted on existing evidence under the user-revised 1.5-second warm-start goal; final P/V validation remains incomplete."
+}

@@ -18,13 +18,65 @@
 #include <cmath>
 #include <utility>
 
+#ifdef Q_OS_MACOS
+#include <CoreText/CoreText.h>
+#include <memory>
+#include <type_traits>
+#endif
+
 namespace Kwi
 {
+namespace
+{
+#ifdef Q_OS_MACOS
+template<typename T>
+auto adoptCF(T value)
+{
+    return std::unique_ptr<std::remove_pointer_t<T>, decltype(&CFRelease)>{value, &CFRelease};
+}
+
+QStringList nativeFixedWidthFonts()
+{
+    // isFixedPitch() populates every queried Qt family, loading font files and
+    // language metadata. Ask Core Text for monospaced descriptors instead.
+    const int monospaced{kCTFontTraitMonoSpace};
+    const auto number = adoptCF(CFNumberCreate(nullptr, kCFNumberIntType, &monospaced));
+    const void *traitKeys[]{kCTFontSymbolicTrait};
+    const void *traitValues[]{number.get()};
+    const auto traits = adoptCF(CFDictionaryCreate(nullptr, traitKeys, traitValues, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
+    const void *keys[]{kCTFontTraitsAttribute};
+    const void *values[]{traits.get()};
+    const auto attributes = adoptCF(CFDictionaryCreate(nullptr, keys, values, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
+    const auto query = adoptCF(CTFontDescriptorCreateWithAttributes(attributes.get()));
+    const auto required = adoptCF(CFSetCreate(nullptr, keys, 1, &kCFTypeSetCallBacks));
+    const auto matches = adoptCF(CTFontDescriptorCreateMatchingFontDescriptors(query.get(), required.get()));
+    QStringList fonts;
+    if (matches) {
+        for (CFIndex n{0}; n < CFArrayGetCount(matches.get()); ++n) {
+            const auto descriptor = static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(matches.get(), n));
+            const auto family = adoptCF(static_cast<CFStringRef>(CTFontDescriptorCopyAttribute(descriptor, kCTFontFamilyNameAttribute)));
+            if (family) {
+                const auto name = QString::fromCFString(family.get());
+                if (!name.isEmpty())
+                    fonts.append(name);
+            }
+        }
+    }
+    fonts.removeDuplicates();
+    fonts.sort(Qt::CaseInsensitive);
+    return fonts;
+}
+#endif
+
+bool fixedWidthFamily(const QString &family)
+{
+    return !family.isEmpty() && QFontDatabase::hasFamily(family) && QFontDatabase::isFixedPitch(family);
+}
+}
 
 TerminalSettings::TerminalSettings(QObject *parent)
     : TerminalPreferences{KSharedConfig::openConfig(QStringLiteral("kwiterminalrc"), KConfig::NoGlobals), parent}
 {
-    refreshFixedWidthFonts();
     qGuiApp->installEventFilter(this);
     connect(qGuiApp, &QGuiApplication::fontDatabaseChanged, this, &TerminalSettings::refreshFixedWidthFonts);
 
@@ -46,6 +98,7 @@ TerminalSettings::TerminalSettings(QObject *parent)
                                 &TerminalPreferences::confirmCloseRunningChanged,
                                 &TerminalPreferences::confirmMultilinePasteChanged,
                                 &TerminalPreferences::copyOnSelectChanged,
+                                &TerminalPreferences::optionAsAltChanged,
                                 &TerminalPreferences::requireCtrlForLinksChanged};
 
     for (const auto signal : changeSignals) {
@@ -96,7 +149,8 @@ QString TerminalSettings::fontFamily() const
 {
     const QString family{TerminalPreferences::fontFamily()};
 
-    return useSystemFont() || !m_fixedWidthFonts.contains(family) ? QFontDatabase::systemFont(QFontDatabase::FixedFont).family() : family;
+    // Validating one configured face must not enumerate/load every fixed font.
+    return useSystemFont() || !fixedWidthFamily(family) ? QFontDatabase::systemFont(QFontDatabase::FixedFont).family() : family;
 }
 
 qreal TerminalSettings::fontPointSize() const
@@ -181,6 +235,24 @@ void TerminalSettings::setRemoteTitleFormat(const QString &value)
 
 QStringList TerminalSettings::fixedWidthFonts() const
 {
+    // The complete picker model is only needed when preferences are opened.
+    if (!m_fixedWidthFontsValid) {
+#ifdef Q_OS_MACOS
+        QStringList fonts{nativeFixedWidthFonts()};
+#else
+        QStringList fonts;
+        const auto families = QFontDatabase::families();
+        for (const auto &family : families) {
+            if (QFontDatabase::isFixedPitch(family))
+                fonts.append(family);
+        }
+#endif
+        const auto systemFamily = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
+        if (!fonts.contains(systemFamily))
+            fonts.prepend(systemFamily);
+        m_fixedWidthFonts = std::move(fonts);
+        m_fixedWidthFontsValid = true;
+    }
     return m_fixedWidthFonts;
 }
 
@@ -192,7 +264,7 @@ void TerminalSettings::setUseSystemFont(bool value)
 
     if (!value) {
         // Save the system font on first opt-out, then preserve the user's font across toggles.
-        if (!m_fixedWidthFonts.contains(TerminalPreferences::fontFamily())) {
+        if (!fixedWidthFamily(TerminalPreferences::fontFamily())) {
             TerminalPreferences::setFontFamily(fontFamily());
         }
 
@@ -209,7 +281,7 @@ void TerminalSettings::setUseSystemFont(bool value)
 
 void TerminalSettings::setFontFamily(const QString &value)
 {
-    if (!m_fixedWidthFonts.contains(value) || isFontFamilyImmutable() || (useSystemFont() && isUseSystemFontImmutable())) {
+    if (!fixedWidthFamily(value) || isFontFamilyImmutable() || (useSystemFont() && isUseSystemFontImmutable())) {
         return;
     }
 
@@ -229,26 +301,8 @@ void TerminalSettings::setFontPointSize(qreal value)
 
 void TerminalSettings::refreshFixedWidthFonts()
 {
-    QStringList fixedFonts{};
-    const auto families = QFontDatabase::families();
-
-    for (const QString &family : families) {
-        if (QFontDatabase::isFixedPitch(family)) {
-            fixedFonts.append(family);
-        }
-    }
-
-    const QString systemFamily{QFontDatabase::systemFont(QFontDatabase::FixedFont).family()};
-
-    if (!fixedFonts.contains(systemFamily)) {
-        fixedFonts.prepend(systemFamily);
-    }
-
-    if (fixedFonts != m_fixedWidthFonts) {
-        m_fixedWidthFonts = std::move(fixedFonts);
-
-        Q_EMIT fixedWidthFontsChanged();
-    }
+    m_fixedWidthFontsValid = false;
+    Q_EMIT fixedWidthFontsChanged();
 }
 
 bool TerminalSettings::eventFilter(QObject *object, QEvent *event)

@@ -15,6 +15,7 @@
 #include <memory>
 
 class KPtyDevice;
+class QSocketNotifier;
 
 namespace Kwi
 {
@@ -63,7 +64,7 @@ Q_SIGNALS:
 
 private:
     [[nodiscard]] KPtyDevice *device() const;
-    bool initialize(std::unique_ptr<ProcessController> controller, int masterFd, int columns, int rows);
+    bool initialize(std::unique_ptr<ProcessController> controller, int masterFd, int columns, int rows, bool directRead = false);
     void invalidateProcessInfo(bool input);
     void readOutput();
     void flushInput();
@@ -73,6 +74,7 @@ private:
 
     std::unique_ptr<ProcessController> m_process;
     QTimer m_metadataTimer;
+    std::unique_ptr<QSocketNotifier> m_readNotifier;
     QList<std::function<void()>> m_refreshCallbacks;
     QByteArray m_pendingInput;
     qsizetype m_inputOffset{0};

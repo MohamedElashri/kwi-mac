@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-KDE-Accepted-LGPL
 
 #include "Session.h"
+#include "Diagnostics_p.h"
 #include "ProcessLaunch.h"
 #include "process/SshMetadataResolver_p.h"
 #include <KLocalizedString>
@@ -45,6 +46,11 @@ Session::Session(QObject *parent)
     , m_homeDirectory{QDir::homePath()}
 {
     connect(m_sshMetadata.get(), &SshMetadataResolver::changed, this, &Session::sshInfoChanged);
+    if (traceEnabled()) {
+        const auto marker = QCoreApplication::instance()->property("kwiTraceMarker").toString().toUtf8();
+        if (marker.size() <= 4096)
+            m_traceMarker = marker;
+    }
     m_terminal = std::make_unique<GhosttyQt::Terminal>(m_columns, m_rows, m_scrollbackLines);
 
     if (!m_terminal->isValid()) {
@@ -678,6 +684,7 @@ bool Session::send(const QByteArray &bytes)
 
 void Session::feed(const QByteArray &bytes)
 {
+    const auto started{traceVerbose() ? traceTime() : 0};
     if (!bytes.isEmpty() && !isFinished() && !m_closeRequested) {
         if (m_monitorSilence) {
             m_silenceTimer.start(silenceSeconds() * 1000);
@@ -692,6 +699,14 @@ void Session::feed(const QByteArray &bytes)
 
     if (m_terminal && !m_terminal->feed(bytes)) {
         reportError(i18nd("kwi-terminal", "The terminal could not process output."));
+    }
+    if (!m_traceMarker.isEmpty() && !property("kwiTraceMarkerFed").toBool()) {
+        if (advanceTraceMarker(m_traceMarkerTail, m_traceMarker, bytes))
+            setProperty("kwiTraceMarkerFed", true);
+    }
+    if (traceVerbose()) {
+        trace(QStringLiteral("feed"),
+              {{QStringLiteral("bytes"), bytes.size()}, {QStringLiteral("start_ns"), started}, {QStringLiteral("elapsed_ns"), traceTime() - started}});
     }
 
     updateProgress();
@@ -868,6 +883,15 @@ void Session::resetTerminal()
     }
 
     m_terminal->reset();
+    // reset() emits an empty title update. Clear the override flag as well so
+    // consumers, including accessibility, fall back to the launched program.
+    if (std::exchange(m_hasApplicationTitle, false)) {
+        m_applicationTitle.clear();
+        const QPointer<Session> guard{this};
+        Q_EMIT applicationTitleChanged();
+        if (!guard)
+            return;
+    }
     updateProgress();
 
     Q_EMIT m_events.historyChanged();

@@ -81,7 +81,8 @@ private:
     void resetGroupDefaults(const QString &name);
 
     KConfigWatcher::Ptr m_watcher{};
-    QStringList m_fixedWidthFonts{};
+    mutable QStringList m_fixedWidthFonts{};
+    mutable bool m_fixedWidthFontsValid{false};
 };
 
 }

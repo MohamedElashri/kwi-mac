@@ -13,6 +13,7 @@
 #include <QRectF>
 #include <QRegion>
 #include <QSGNode>
+#include <functional>
 #include <memory>
 
 class QQuickWindow;
@@ -41,6 +42,7 @@ public:
     };
 
     struct Statistics {
+        quint64 terminalId{0};
         quint64 frameGeneration{0};
         quint64 shapedRuns{0};
         quint64 rasterizedGlyphs{0};
@@ -51,9 +53,14 @@ public:
         int cachedRuns{0};
         qsizetype atlasBytes{0};
         qint64 prepareNanoseconds{0};
+        qint64 shapingNanoseconds{0};
+        qint64 glyphBuildNanoseconds{0};
+        qint64 textureFlushNanoseconds{0};
     };
 
-    explicit TerminalNode(QQuickWindow *window, bool collectStatistics = false);
+    using StatisticsCallback = std::function<void(const Statistics &)>;
+    // Called on the render thread after preparation; the callback must not access GUI objects.
+    explicit TerminalNode(QQuickWindow *window, bool collectStatistics = false, StatisticsCallback prepared = {});
     ~TerminalNode() override;
 
     void synchronize(const Frame &frame, const Options &options);

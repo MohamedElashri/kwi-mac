@@ -6,11 +6,12 @@
 
 #include <KConfig>
 #include <KConfigGroup>
-#include <KDirWatch>
 #include <KLocalizedString>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QFileSystemWatcher>
+#include <QSet>
 #include <QStandardPaths>
 #include <QUuid>
 
@@ -105,19 +106,12 @@ bool writePreset(const QString &path, const QString &name, const LaunchSettings 
 TerminalPresets::TerminalPresets(TerminalSettings *settings, QObject *parent)
     : QObject{parent}
     , m_settings{settings}
+    , m_watcher{new QFileSystemWatcher(this)}
 {
     Q_ASSERT(settings);
 
-    auto *watcher = new KDirWatch(this);
-    const QStringList directories{QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation)};
-
-    for (const QString &directory : directories) {
-        watcher->addDir(directory + QStringLiteral("/kwi/presets"), KDirWatch::WatchFiles);
-    }
-
-    connect(watcher, &KDirWatch::dirty, this, &TerminalPresets::refresh);
-    connect(watcher, &KDirWatch::created, this, &TerminalPresets::refresh);
-    connect(watcher, &KDirWatch::deleted, this, &TerminalPresets::refresh);
+    connect(m_watcher, &QFileSystemWatcher::directoryChanged, this, &TerminalPresets::refresh);
+    connect(m_watcher, &QFileSystemWatcher::fileChanged, this, &TerminalPresets::refresh);
     connect(settings, &TerminalSettings::defaultPresetChanged, this, &TerminalPresets::changed);
 
     refresh();
@@ -225,6 +219,20 @@ bool TerminalPresets::setError(const QString &error)
 void TerminalPresets::refresh()
 {
     QList<TerminalPreset> presets{{m_settings->defaultDefaultPresetValue(), builtinPresetName(), {}, {}, false}};
+    QSet<QString> watchPaths;
+    for (const auto &base : QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation)) {
+        // Follow directory creation a level at a time. Registering only a
+        // nonexistent presets directory missed later file edits on Darwin.
+        QString path{base + QStringLiteral("/kwi/presets")};
+        while (!QDir(path).exists()) {
+            const auto parent = QFileInfo(path).absolutePath();
+            if (parent == path)
+                break;
+            path = parent;
+        }
+        if (QDir(path).exists())
+            watchPaths.insert(path);
+    }
     const QStringList directories{
         QStandardPaths::locateAll(QStandardPaths::GenericDataLocation, QStringLiteral("kwi/presets"), QStandardPaths::LocateDirectory)};
 
@@ -232,6 +240,7 @@ void TerminalPresets::refresh()
         const QFileInfoList files{QDir(directory).entryInfoList({QStringLiteral("*.preset")}, QDir::Files | QDir::Readable, QDir::Name)};
 
         for (const auto &file : files) {
+            watchPaths.insert(file.absoluteFilePath());
             auto candidate = readPreset(file.absoluteFilePath());
 
             if (!candidate || std::any_of(presets.cbegin(), presets.cend(), [&candidate](const auto &existing) {
@@ -249,6 +258,15 @@ void TerminalPresets::refresh()
     });
 
     m_presets = std::move(presets);
+
+    const auto registered = m_watcher->directories() + m_watcher->files();
+    const QSet<QString> current{registered.cbegin(), registered.cend()};
+    const auto obsolete = (current - watchPaths).values();
+    const auto missing = (watchPaths - current).values();
+    if (!obsolete.isEmpty())
+        m_watcher->removePaths(obsolete);
+    if (!missing.isEmpty())
+        m_watcher->addPaths(missing);
 
     Q_EMIT changed();
 }

@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Kwi contributors
+# SPDX-License-Identifier: CC0-1.0
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test build, packaging and measurement tools
+        run: python3 -m unittest discover -s tests/macos -v
+      - name: Check whitespace and local-only plan
+        run: |
+          git diff --check
+          test -z "$(git ls-files plan.md)"

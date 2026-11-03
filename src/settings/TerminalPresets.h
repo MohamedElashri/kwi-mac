@@ -14,6 +14,8 @@
 #include <QtQmlIntegration/qqmlintegration.h>
 #include <optional>
 
+class QFileSystemWatcher;
+
 namespace Kwi
 {
 class TerminalSettings;
@@ -64,6 +66,7 @@ private:
 
     QList<TerminalPreset> m_presets{};
     TerminalSettings *m_settings;
+    QFileSystemWatcher *m_watcher;
     QString m_error{};
 };
 }

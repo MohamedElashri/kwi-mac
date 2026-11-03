@@ -4,7 +4,13 @@
 #include "NativeProcessInfo_p.h"
 #include "ProcessQueryLimits_p.h"
 
-#ifdef Q_OS_FREEBSD
+#ifdef Q_OS_MACOS
+#include "DarwinProcessArguments_p.h"
+#include <libproc.h>
+#include <sys/sysctl.h>
+#include <unistd.h>
+#include <vector>
+#elif defined(Q_OS_FREEBSD)
 #include <cstddef>
 #include <limits.h>
 #include <span>
@@ -21,7 +27,95 @@
 
 namespace Kwi::NativeProcessInfo
 {
-#ifdef Q_OS_FREEBSD
+#ifdef Q_OS_MACOS
+QString directory(pid_t pid)
+{
+    proc_vnodepathinfo info{};
+
+    if (pid <= 0 || proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &info, sizeof(info)) != sizeof(info)) {
+        return {};
+    }
+
+    return QString::fromLocal8Bit(info.pvi_cdir.vip_path, strnlen(info.pvi_cdir.vip_path, sizeof(info.pvi_cdir.vip_path)));
+}
+
+QString executable(pid_t pid)
+{
+    char path[PROC_PIDPATHINFO_MAXSIZE]{};
+
+    if (pid <= 0 || proc_pidpath(pid, path, sizeof(path)) <= 0) {
+        return {};
+    }
+
+    return QString::fromLocal8Bit(path, strnlen(path, sizeof(path)));
+}
+
+QByteArray commandLine(pid_t pid)
+{
+    // KERN_PROCARGS2 includes the executable path and environment as well as argv.
+    // Query its bounded kernel capacity, then return only the normalized argv.
+    int limit{};
+    size_t size{sizeof(limit)};
+    const int limitMib[]{CTL_KERN, KERN_ARGMAX};
+
+    if (pid <= 0 || sysctl(const_cast<int *>(limitMib), 2, &limit, &size, nullptr, 0) != 0 || size != sizeof(limit) || limit <= 0 || limit > 2 * 1024 * 1024) {
+        return {};
+    }
+
+    QByteArray bytes(limit, Qt::Uninitialized);
+    size = size_t(bytes.size());
+    int mib[]{CTL_KERN, KERN_PROCARGS2, pid};
+
+    if (sysctl(mib, 3, bytes.data(), &size, nullptr, 0) != 0 || size > size_t(bytes.size())) {
+        return {};
+    }
+
+    return darwinArguments(QByteArrayView{bytes.constData(), qsizetype(size)});
+}
+
+quint64 startTime(pid_t pid)
+{
+    proc_bsdinfo info{};
+
+    if (pid <= 0 || proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, sizeof(info)) != sizeof(info)) {
+        return 0;
+    }
+
+    return info.pbi_start_tvsec * 1000000 + info.pbi_start_tvusec;
+}
+
+pid_t groupMember(pid_t group, pid_t session)
+{
+    if (group <= 0 || session <= 0) {
+        return -1;
+    }
+
+    // Only enumerate this group, and only when its leader has gone. Bound both
+    // allocation and races with group growth; never scan all PIDs on the UI path.
+    constexpr int maximumMembers{16384};
+    const int bytes{proc_listpids(PROC_PGRP_ONLY, uint32_t(group), nullptr, 0)};
+
+    if (bytes <= 0 || bytes > int(sizeof(pid_t)) * maximumMembers) {
+        return -1;
+    }
+
+    const int capacity{qMin(maximumMembers, bytes / int(sizeof(pid_t)) + 32)};
+    std::vector<pid_t> members(capacity);
+    const int used{proc_listpids(PROC_PGRP_ONLY, uint32_t(group), members.data(), capacity * int(sizeof(pid_t)))};
+
+    if (used <= 0 || used >= capacity * int(sizeof(pid_t))) {
+        return -1;
+    }
+
+    for (int i{0}; i < used / int(sizeof(pid_t)); ++i) {
+        if (members[i] > 0 && getpgid(members[i]) == group && getsid(members[i]) == session) {
+            return members[i];
+        }
+    }
+
+    return -1;
+}
+#elif defined(Q_OS_FREEBSD)
 namespace
 {
 bool query(pid_t pid, int field, void *data, size_t &size)
@@ -131,6 +225,10 @@ quint64 startTime(pid_t pid)
 
 pid_t groupMember(pid_t group, pid_t session)
 {
+    if (group <= 0 || session <= 0) {
+        return -1;
+    }
+
     for (const auto &entry : QDirListing{QStringLiteral("/proc"), QDirListing::IteratorFlag::DirsOnly}) {
         bool valid{false};
         const int pid{entry.fileName().toInt(&valid)};

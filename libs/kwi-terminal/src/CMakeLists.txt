@@ -50,3 +50,9 @@ target_compile_definitions(kwi-terminal PRIVATE TRANSLATION_DOMAIN="kwi-terminal
 
 install(TARGETS kwi-terminal ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 ecm_finalize_qml_module(kwi-terminal DESTINATION ${KDE_INSTALL_QMLDIR})
+
+if(APPLE)
+    enable_language(OBJCXX)
+    target_sources(kwi-terminal PRIVATE MacInput.mm MacInput_p.h)
+    target_link_libraries(kwi-terminal PRIVATE "-framework AppKit")
+endif()

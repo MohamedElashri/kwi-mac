@@ -2,16 +2,33 @@
 // SPDX-License-Identifier: LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-KDE-Accepted-LGPL
 
 #include "ProcessLaunch.h"
+#include "process/NativeLaunch_p.h"
 
 #include <KLocalizedString>
 #include <KUser>
 #include <QDir>
+#include <QFileInfo>
+#ifdef Q_OS_MACOS
+#include <QLocale>
+#include <xlocale.h>
+#endif
 #include <algorithm>
 
 namespace Kwi
 {
 QString systemShell(const QProcessEnvironment &environment)
 {
+#ifdef Q_OS_MACOS
+    for (const auto &shell : {KUser{}.shell(), environment.value(QStringLiteral("SHELL")), QStringLiteral("/bin/sh")}) {
+        const QFileInfo file{shell};
+
+        if (file.isAbsolute() && file.isFile() && file.isExecutable()) {
+            return shell;
+        }
+    }
+
+    return QStringLiteral("/bin/sh");
+#else
     QString shell{environment.value(QStringLiteral("SHELL"))};
 
     if (shell.isEmpty()) {
@@ -19,6 +36,31 @@ QString systemShell(const QProcessEnvironment &environment)
     }
 
     return shell.isEmpty() ? QStringLiteral("/bin/sh") : shell;
+#endif
+}
+
+QStringList nativeLaunchArguments(const TerminalLaunch &launch, const QString &executable)
+{
+#ifdef Q_OS_MACOS
+    // An explicit command is never rewritten. Known automatically selected shells
+    // run their normal login setup; unknown custom shells retain their own argv.
+    const QString name{QFileInfo(executable).fileName()};
+    const QStringList loginShells{QStringLiteral("sh"),
+                                  QStringLiteral("bash"),
+                                  QStringLiteral("zsh"),
+                                  QStringLiteral("ksh"),
+                                  QStringLiteral("fish"),
+                                  QStringLiteral("csh"),
+                                  QStringLiteral("tcsh")};
+
+    if (launch.program.isEmpty() && launch.arguments.isEmpty() && loginShells.contains(name)) {
+        return {QStringLiteral("-l")};
+    }
+#else
+    Q_UNUSED(executable)
+#endif
+
+    return launch.arguments;
 }
 
 QMap<QString, std::optional<QString>> TerminalLaunch::resolvedEnvironmentChanges() const
@@ -30,6 +72,23 @@ QMap<QString, std::optional<QString>> TerminalLaunch::resolvedEnvironmentChanges
                                                  {QStringLiteral("LINES"), std::nullopt},
                                                  {QStringLiteral("TERMCAP"), std::nullopt}};
     result.insert(environmentChanges);
+#ifdef Q_OS_MACOS
+    // Finder/Launch Services need not supply a locale. Give native children a
+    // valid UTF-8 default without running a shell to discover environment data.
+    // Explicit caller values (including empty values/removals) take precedence.
+    const auto specified = [&](const QString &name) {
+        return inheritedEnvironment.contains(name) || environmentChanges.contains(name);
+    };
+    if (!specified(QStringLiteral("LANG")) && !specified(QStringLiteral("LC_ALL")) && !specified(QStringLiteral("LC_CTYPE"))) {
+        QString locale{QLocale::system().name() + QStringLiteral(".UTF-8")};
+        if (const auto native = newlocale(LC_CTYPE_MASK, locale.toLocal8Bit().constData(), nullptr)) {
+            freelocale(native);
+        } else {
+            locale = QStringLiteral("en_US.UTF-8");
+        }
+        result.insert(QStringLiteral("LANG"), locale);
+    }
+#endif
 
     return result;
 }

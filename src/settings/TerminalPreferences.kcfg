@@ -7,13 +7,13 @@
     <kcfgfile arg="true"/>
     <group name="Appearance">
         <entry name="useSystemFont" key="UseSystemFont" type="Bool">
-            <default>true</default>
+            <default code="true">SettingsConstraints::DefaultUseSystemFont</default>
         </entry>
         <entry name="fontFamily" key="FontFamily" type="String">
             <default></default>
         </entry>
         <entry name="fontPointSize" key="FontPointSize" type="Double">
-            <default>0.0</default>
+            <default code="true">SettingsConstraints::DefaultFontPointSize</default>
         </entry>
         <entry name="colorScheme" key="ColorScheme" type="String">
             <default>system</default>
@@ -60,6 +60,9 @@
         </entry>
     </group>
     <group name="Behavior">
+        <entry name="optionAsAlt" key="OptionAsAlt" type="Bool">
+            <default>false</default>
+        </entry>
         <entry name="confirmCloseRunning" key="ConfirmCloseRunning" type="Bool">
             <default>true</default>
         </entry>

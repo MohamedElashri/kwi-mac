@@ -118,6 +118,13 @@ GlyphImage GlyphAtlas::glyph(const QRawFont &font, quint32 index, bool allowSubp
         return found;
     }
 
+    // CoreText bounds queries can be expensive. Do this only on an atlas miss,
+    // and reuse the result for grayscale bearings rather than querying twice.
+    const QRectF bounds{font.boundingRect(index)};
+    if (bounds.isEmpty()) {
+        return {};
+    }
+
     QImage source{font.alphaMapForGlyph(index, subpixel ? QRawFont::SubPixelAntialiasing : QRawFont::PixelAntialiasing)};
     QPointF bearing;
 
@@ -126,7 +133,6 @@ GlyphImage GlyphAtlas::glyph(const QRawFont &font, quint32 index, bool allowSubp
         const auto bounds = engine->alphaMapBoundingBox(index, {}, {}, QFontEngine::Format_A32);
         bearing = QPointF(bounds.x.truncate(), bounds.y.truncate());
     } else {
-        const QRectF bounds{font.boundingRect(index)};
         bearing = QPointF(std::floor(bounds.left()), std::floor(bounds.top()));
     }
 

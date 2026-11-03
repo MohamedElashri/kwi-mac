@@ -79,6 +79,16 @@ SettingsPage {
                     id: fontSize
 
                     objectName: "fontSizeSetting"
+                    // Native size hints can omit the decimal editor's dimensions.
+                    // Measure text independently of the native style's geometry
+                    // to avoid a size/padding binding cycle. Leave stepper room.
+                    readonly property FontMetrics sizeMetrics: FontMetrics {
+                        font: fontSize.font
+                    }
+                    implicitWidth: Math.ceil(sizeMetrics.advanceWidth(Number(to / 10).toLocaleString(locale, 'f', 1)) + Kirigami.Units.gridUnit * 2)
+                    implicitHeight: Math.ceil(sizeMetrics.height + topPadding + bottomPadding + 2)
+                    Layout.minimumWidth: implicitWidth
+                    Layout.minimumHeight: implicitHeight
                     editable: true
                     from: 60
                     to: 480

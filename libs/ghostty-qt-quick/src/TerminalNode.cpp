@@ -485,9 +485,10 @@ class TerminalNode::Private
     Q_DISABLE_COPY_MOVE(Private)
 
 public:
-    explicit Private(TerminalNode *node, QQuickWindow *window, bool collectStatistics)
+    explicit Private(TerminalNode *node, QQuickWindow *window, bool collectStatistics, StatisticsCallback onPrepared)
         : window{window}
-        , statistics{collectStatistics ? std::optional{Statistics{}} : std::nullopt}
+        , statistics{collectStatistics || onPrepared ? std::optional{Statistics{}} : std::nullopt}
+        , prepared{std::move(onPrepared)}
         , atlas{std::make_unique<GlyphAtlas>(window, statistics ? &statistics->rasterizedGlyphs : nullptr)}
     {
         for (auto *&padding : background) {
@@ -538,6 +539,7 @@ public:
     QVector<Row> rows;
     std::vector<ImageTexture> imageTextures;
     std::optional<Statistics> statistics;
+    StatisticsCallback prepared;
     std::unique_ptr<GlyphAtlas> atlas;
     GlyphBufferPool glyphBuffers;
     GridShaper shaper;
@@ -824,17 +826,18 @@ public:
 
             end = qMin(end, int(cells.size()));
             bool missed{false};
+            QElapsedTimer stage;
+            if (statistics)
+                stage.start();
             const auto run = shaper.shape(cells, begin, end, statistics ? &missed : nullptr);
 
             if (statistics) {
                 statistics->shapedRuns += missed;
+                statistics->shapingNanoseconds += stage.nsecsElapsed();
+                stage.restart();
             }
 
             for (const auto &glyph : run) {
-                if (glyph.font.boundingRect(glyph.index).isEmpty()) {
-                    continue;
-                }
-
                 const bool pixelAligned{glyph.scale == 1};
                 const bool subpixel{pixelAligned && options.backgroundOpacity == 1 && frame.background.alpha() == 255};
                 const auto image = atlas->glyph(glyph.font, glyph.index, subpixel);
@@ -849,6 +852,8 @@ public:
                             rowCursorColumn,
                             pixelAligned);
             }
+            if (statistics)
+                statistics->glyphBuildNanoseconds += stage.nsecsElapsed();
 
             begin = end;
         }
@@ -1019,8 +1024,8 @@ public:
     }
 };
 
-TerminalNode::TerminalNode(QQuickWindow *window, bool collectStatistics)
-    : d{std::make_unique<Private>(this, window, collectStatistics)}
+TerminalNode::TerminalNode(QQuickWindow *window, bool collectStatistics, StatisticsCallback prepared)
+    : d{std::make_unique<Private>(this, window, collectStatistics, std::move(prepared))}
 {
     initializeTerminalShaders();
     setFlag(UsePreprocess);
@@ -1053,6 +1058,9 @@ void TerminalNode::prepare(const Frame &frame, const Options &options)
 
     if (d->statistics) {
         timer.start();
+        d->statistics->shapingNanoseconds = 0;
+        d->statistics->glyphBuildNanoseconds = 0;
+        d->statistics->textureFlushNanoseconds = 0;
     }
 
     const bool fontChanged = !d->initialized || options.font != d->options.font || options.devicePixelRatio != d->options.devicePixelRatio
@@ -1271,14 +1279,21 @@ void TerminalNode::prepare(const Frame &frame, const Options &options)
         d->compactionThreshold = qMax(GlyphAtlas::PixelBudget, d->atlas->byteSize() * 3 / 2);
     }
 
+    QElapsedTimer flush;
+    if (d->statistics)
+        flush.start();
     d->atlas->flush(d->statistics ? &d->statistics->textureUploadBytes : nullptr);
 
     if (d->statistics) {
         d->statistics->atlasPages = d->atlas->pageCount();
         d->statistics->cachedRuns = d->shaper.cacheSize();
         d->statistics->atlasBytes = d->atlas->byteSize();
+        d->statistics->terminalId = frame.terminalId;
         d->statistics->frameGeneration = frame.generation;
         d->statistics->prepareNanoseconds = timer.nsecsElapsed();
+        d->statistics->textureFlushNanoseconds = flush.nsecsElapsed();
+        if (d->prepared)
+            d->prepared(*d->statistics);
     }
 
     d->initialized = true;

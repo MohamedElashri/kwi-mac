@@ -4,6 +4,10 @@
 cmake_minimum_required(VERSION 3.28)
 project(kwi VERSION 0.1.0 LANGUAGES C CXX)
 
+if(APPLE)
+    enable_language(OBJCXX)
+endif()
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -27,7 +31,12 @@ include(ECMQmlModule)
 include(GenerateExportHeader)
 include(FeatureSummary)
 
-option(BUILD_KPART "Build the Kwi terminal KPart" ON)
+if(APPLE)
+    set(_kwi_kpart_default OFF)
+else()
+    set(_kwi_kpart_default ON)
+endif()
+option(BUILD_KPART "Build the Kwi terminal KPart" ${_kwi_kpart_default})
 
 find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS
     Core Gui GuiPrivate Quick Qml QmlIntegration QuickControls2 Concurrent DBus Network Widgets
@@ -35,6 +44,10 @@ find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS
 find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS
     CoreAddons Config DBusAddons GuiAddons I18n Kirigami Pty KIO Notifications
     WindowSystem)
+if(APPLE)
+    find_package(KF6BreezeIcons ${KF_MIN_VERSION} REQUIRED)
+    find_package(KF6IconThemes ${KF_MIN_VERSION} REQUIRED)
+endif()
 
 if(BUILD_KPART)
     find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS QuickWidgets)
@@ -66,6 +79,11 @@ add_subdirectory(libs/ghostty-qt-quick)
 add_subdirectory(libs/kwi-terminal)
 add_subdirectory(src)
 add_subdirectory(data)
+
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 ki18n_install(po)
 

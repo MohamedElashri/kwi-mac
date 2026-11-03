@@ -1664,15 +1664,20 @@ std::optional<Notification> Terminal::takeNotification()
     return std::exchange(d->notification, std::nullopt);
 }
 
-QByteArray Terminal::encodeKey(const QKeyEvent &event, KeyboardLocks locks)
+QByteArray Terminal::encodeKey(const QKeyEvent &event, KeyboardLocks locks, bool optionAsAlt)
 {
     d->assertThread();
 
     if (event.type() != QEvent::KeyPress && event.type() != QEvent::KeyRelease)
         return {};
 
-    const auto input = keyInput(event);
+    const auto input = keyInput(event, optionAsAlt);
     ghostty_key_encoder_setopt_from_terminal(d->keyEncoder, d->terminal);
+#ifdef Q_OS_MACOS
+    // setopt_from_terminal resets this non-terminal option on every key.
+    const GhosttyOptionAsAlt optionMode{optionAsAlt ? GHOSTTY_OPTION_AS_ALT_TRUE : GHOSTTY_OPTION_AS_ALT_FALSE};
+    ghostty_key_encoder_setopt(d->keyEncoder, GHOSTTY_KEY_ENCODER_OPT_MACOS_OPTION_AS_ALT, &optionMode);
+#endif
     ghostty_key_event_set_action(d->keyEvent, input.action);
     ghostty_key_event_set_key(d->keyEvent, input.key);
     ghostty_key_event_set_mods(d->keyEvent, input.modifiers | (locks.capsLock ? GHOSTTY_MODS_CAPS_LOCK : 0) | (locks.numLock ? GHOSTTY_MODS_NUM_LOCK : 0));

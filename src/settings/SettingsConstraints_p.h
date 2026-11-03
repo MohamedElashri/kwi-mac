@@ -8,6 +8,15 @@
 
 namespace Kwi::SettingsConstraints
 {
+#ifdef Q_OS_MACOS
+// Qt's system fixed-font size is too small for a terminal on macOS. Keep the
+// platform's fixed-width family while giving fresh/reset profiles a readable size.
+inline constexpr bool DefaultUseSystemFont{false};
+inline constexpr qreal DefaultFontPointSize{14.0};
+#else
+inline constexpr bool DefaultUseSystemFont{true};
+inline constexpr qreal DefaultFontPointSize{0.0};
+#endif
 inline constexpr qreal MinimumFontPointSize{6.0};
 inline constexpr qreal MaximumFontPointSize{48.0};
 inline constexpr int MaximumScrollbackLines{100000};

@@ -306,7 +306,7 @@ SettingsPage {
                         id: historyMode
 
                         objectName: "scrollbackMode"
-                        model: [KI18n.i18nc("@item:inlistbox", "None"), KI18n.i18nc("@item:inlistbox", "Limited"), KI18n.i18nc("@item:inlistbox", "Unlimited")]
+                        model: [KI18n.i18nc("@item:inlistbox", "None"), KI18n.i18nc("@item:inlistbox", "Limited"), KI18n.i18nc("@item:inlistbox", "No line limit")]
                         currentIndex: root.appSettings.scrollbackLines === -1 ? 2 : (root.appSettings.scrollbackLines === 0 ? 0 : 1)
 
                         onActivated: index => {
@@ -341,6 +341,14 @@ SettingsPage {
                         enabled: historyMode.currentIndex === 1
                     }
                 }
+            }
+
+            Controls.Label {
+                objectName: "historyRetentionNotice"
+                visible: root.appSettings.scrollbackLines === -1
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: KI18n.i18nc("@info", "History is memory limited. Older output may be discarded when the limit is reached, including during continuous output.")
             }
         }
 

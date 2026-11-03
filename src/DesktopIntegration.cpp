@@ -11,8 +11,10 @@
 #include <KLocalizedString>
 #include <KNotification>
 #include <KSandbox>
-#include <KWaylandExtras>
 #include <KWindowSystem>
+#ifndef Q_OS_MACOS
+#include <KWaylandExtras>
+#endif
 #include <QDir>
 #include <QGuiApplication>
 #include <QIcon>
@@ -221,16 +223,21 @@ void DesktopIntegration::launchHostCommand(const QString &program, const QString
         job->start();
     };
 
+#ifndef Q_OS_MACOS
     if (m_window && KWindowSystem::isPlatformWayland()) {
         KWaylandExtras::xdgActivationToken(m_window, {}).then(this, launch);
     } else {
         launch({});
     }
+#else
+    launch({});
+#endif
 }
 
 void DesktopIntegration::openUrl(const QUrl &url)
 {
     if (!url.isValid() || url.scheme().isEmpty() || url.toEncoded().size() > maximumUrlLength) {
+        setError(i18n("The link is invalid or too long."));
         return;
     }
 
@@ -331,11 +338,17 @@ void DesktopIntegration::activateSession(TerminalSession *session, const QString
     m_window->setWindowStates(m_window->windowStates() & ~Qt::WindowMinimized);
     m_window->setVisible(true);
 
+#ifdef Q_OS_MACOS
+    Q_UNUSED(activationToken)
+    m_window->raise();
+    m_window->requestActivate();
+#else
     if (!activationToken.isEmpty()) {
         KWindowSystem::setCurrentXdgActivationToken(activationToken);
     }
 
     KWindowSystem::activateWindow(m_window);
+#endif
 
     Q_EMIT sessionActivationRequested(session);
 }

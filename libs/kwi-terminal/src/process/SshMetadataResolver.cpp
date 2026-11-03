@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-KDE-Accepted-LGPL
 
 #include "HostCommandQuery_p.h"
+#include "NativeProcessInfo_p.h"
 #include "ProcessQueryLimits_p.h"
 #include "SshMetadataResolver_p.h"
 
@@ -21,6 +22,12 @@ namespace Kwi
 {
 namespace
 {
+bool currentNativeProcess(const SshProcessInfo &process)
+{
+    return process.pid > 0 && process.startTime != 0 && NativeProcessInfo::startTime(pid_t(process.pid)) == process.startTime
+        && NativeProcessInfo::executable(pid_t(process.pid)) == process.executable;
+}
+
 void killNativeQuery(QProcess &query)
 {
     // Match exec may have a child: the query owns a separate session/group.
@@ -230,6 +237,10 @@ void SshMetadataResolver::startQuery(const SshConfigurationQuery &command)
         return;
     }
 
+    if (!currentNativeProcess(m_process)) {
+        return;
+    }
+
     auto *query = new KProcess(this);
     m_nativeQuery = query;
     query->setProgram(m_process.executable, command.arguments);
@@ -298,7 +309,10 @@ void SshMetadataResolver::cancel()
         query->moveToThread(nullptr);
         (void)QtConcurrent::run([query = std::move(query)]() mutable {
             query->moveToThread(QThread::currentThread());
-            query->waitForFinished(-1);
+            if (!query->waitForFinished(5000)) {
+                query->kill();
+                query->waitForFinished(1000);
+            }
         });
     }
 }
@@ -326,6 +340,9 @@ void SshMetadataResolver::readOutput(bool standardError)
 
 void SshMetadataResolver::complete(bool success, const QByteArray &output)
 {
+    if (!KSandbox::isFlatpak() && !currentNativeProcess(m_process)) {
+        return;
+    }
     const auto result = success ? sshMetadata(output, m_remoteCommand) : std::nullopt;
 
     if (result) {

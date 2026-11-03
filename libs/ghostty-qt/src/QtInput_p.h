@@ -21,6 +21,7 @@ struct KeyInput {
     QByteArray text;
 };
 
-[[nodiscard]] KeyInput keyInput(const QKeyEvent &event);
+[[nodiscard]] KeyInput keyInput(const QKeyEvent &event, bool optionAsAlt = false);
+[[nodiscard]] Qt::KeyboardModifiers terminalModifiers(Qt::KeyboardModifiers modifiers);
 [[nodiscard]] GhosttyMods ghosttyModifiers(Qt::KeyboardModifiers modifiers);
 }

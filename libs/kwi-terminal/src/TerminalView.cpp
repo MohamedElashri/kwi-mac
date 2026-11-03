@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-KDE-Accepted-LGPL
 
 #include "TerminalView.h"
+#include "Diagnostics_p.h"
 #include "SessionEvents_p.h"
 #include "TerminalColors.h"
 #include "TerminalSearch.h"
+#ifdef Q_OS_MACOS
+#include "MacInput_p.h"
+#endif
 #include <FontMetrics.h>
 #include <PreeditLayout.h>
 #include <TerminalNode.h>
@@ -67,6 +71,14 @@ int accumulateWheelSteps(qreal delta, qreal stepSize, qreal &remainder)
 
 quint64 keyIdentity(const QKeyEvent *event)
 {
+#ifdef Q_OS_MACOS
+    if (QGuiApplication::platformName() == QLatin1String("cocoa")) {
+        if (event->nativeVirtualKey() == 0 && event->key() >= Qt::Key_Shift && event->key() <= Qt::Key_ScrollLock) {
+            return quint64(event->key());
+        }
+        return (quint64(1) << 32) | event->nativeVirtualKey();
+    }
+#endif
     return event->nativeScanCode() ? (quint64(1) << 32) | event->nativeScanCode() : quint64(event->key());
 }
 
@@ -195,7 +207,11 @@ QVector<TextLink> textLinks(const QString &line, const QString &directory, bool 
 TerminalView::TerminalView(QQuickItem *parent)
     : QQuickItem{parent}
     , m_search{new TerminalSearch(this)}
+#ifdef Q_OS_MACOS
+    , m_modifierKeyInfo{nullptr} // KF has no Cocoa lock-state backend; native events carry Caps Lock.
+#else
     , m_modifierKeyInfo{new KModifierKeyInfo(this)}
+#endif
     , m_paletteWatch{new KDirWatch(this)}
 {
     m_paletteReloadTimer.setSingleShot(true);
@@ -348,6 +364,7 @@ void TerminalView::changeSession(Session *newSession)
     m_selecting = false;
     m_selectionRectangle = false;
     m_keyboardSelectionMode = false;
+    m_traceMarkerSeen = false;
     m_selectionScrollTimer.stop();
     updateHoveredLink({}, Qt::NoModifier);
     m_dragPending = false;
@@ -623,7 +640,33 @@ void TerminalView::updatePolish()
     const bool cursorWasVisible{m_frame.cursorVisible};
     const QRectF previousSelectionCursor{m_keyboardSelectionMode ? selectionCursorRectangle() : QRectF()};
 
-    if (m_session && m_session->snapshot(m_frame)) {
+    const auto started{traceVerbose() ? traceTime() : 0};
+    const bool captured{m_session && m_session->snapshot(m_frame)};
+    if (traceEnabled() && captured) {
+        trace(QStringLiteral("snapshot-generation"),
+              {{QStringLiteral("generation"), qint64(m_frame.generation)}, {QStringLiteral("terminal_id"), qint64(m_frame.terminalId)}});
+        if (traceVerbose())
+            trace(QStringLiteral("snapshot"),
+                  {{QStringLiteral("elapsed_ns"), traceTime() - started},
+                   {QStringLiteral("generation"), qint64(m_frame.generation)},
+                   {QStringLiteral("columns"), m_frame.columns},
+                   {QStringLiteral("rows"), m_frame.rows.size()}});
+        const auto marker = QCoreApplication::instance()->property("kwiTraceMarker").toString();
+        if (!m_traceMarkerSeen && !marker.isEmpty() && m_session->property("kwiTraceMarkerFed").toBool()) {
+            QString text;
+            for (const auto &row : std::as_const(m_frame.rows)) {
+                for (const auto &cell : row) {
+                    text += cell.text;
+                }
+            }
+            if (text.contains(marker)) {
+                m_traceMarkerSeen = true;
+                trace(QStringLiteral("marker-snapshot"),
+                      {{QStringLiteral("generation"), qint64(m_frame.generation)}, {QStringLiteral("terminal_id"), qint64(m_frame.terminalId)}});
+            }
+        }
+    }
+    if (captured) {
         m_searchMatches = m_search->viewportMatches(previousOffset != m_frame.scrollOffset);
         ++m_frameRevision;
 
@@ -793,7 +836,33 @@ QSGNode *TerminalView::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
     auto *node = static_cast<GhosttyQt::Quick::TerminalNode *>(oldNode);
 
     if (!node) {
-        node = new GhosttyQt::Quick::TerminalNode(window());
+        GhosttyQt::Quick::TerminalNode::StatisticsCallback prepared;
+        if (traceEnabled()) {
+            prepared = [](const GhosttyQt::Quick::TerminalNode::Statistics &stats) {
+                trace(QStringLiteral("render"),
+                      {{QStringLiteral("terminal_id"), qint64(stats.terminalId)},
+                       {QStringLiteral("generation"), qint64(stats.frameGeneration)},
+                       {QStringLiteral("prepare_ns"), stats.prepareNanoseconds},
+                       {QStringLiteral("shaping_ns"), stats.shapingNanoseconds},
+                       {QStringLiteral("glyph_build_ns"), stats.glyphBuildNanoseconds},
+                       {QStringLiteral("texture_flush_ns"), stats.textureFlushNanoseconds},
+                       {QStringLiteral("shaped_runs"), qint64(stats.shapedRuns)},
+                       {QStringLiteral("rasterized_glyphs"), qint64(stats.rasterizedGlyphs)},
+                       {QStringLiteral("upload_bytes"), qint64(stats.textureUploadBytes)},
+                       {QStringLiteral("rebuilt_rows"), qint64(stats.rebuiltRows)},
+                       {QStringLiteral("atlas_bytes"), qint64(stats.atlasBytes)}});
+            };
+        }
+        node = new GhosttyQt::Quick::TerminalNode(window(), traceEnabled(), std::move(prepared));
+        if (traceEnabled()) {
+            const QFontInfo resolved{m_font};
+            trace(QStringLiteral("configuration"),
+                  {{QStringLiteral("font_family"), resolved.family()},
+                   {QStringLiteral("font_point_size"), resolved.pointSizeF()},
+                   {QStringLiteral("font_pixel_size"), resolved.pixelSize()},
+                   {QStringLiteral("opacity"), m_backgroundOpacity},
+                   {QStringLiteral("scrollback_lines"), m_session ? m_session->scrollbackLines() : -2}});
+        }
     }
 
     GhosttyQt::Quick::TerminalNode::Options options;
@@ -1109,7 +1178,8 @@ void TerminalView::paste()
 
 void TerminalView::pasteSelection()
 {
-    requestPaste(QGuiApplication::clipboard()->text(QClipboard::Selection));
+    if (QGuiApplication::clipboard()->supportsSelection())
+        requestPaste(QGuiApplication::clipboard()->text(QClipboard::Selection));
 }
 
 bool TerminalView::copyCommandOutput()
@@ -1223,6 +1293,20 @@ void TerminalView::scrollHistory(QPoint pixelDelta, QPoint angleDelta, Qt::Keybo
     }
 }
 
+bool TerminalView::optionAsAlt() const
+{
+    return m_optionAsAlt;
+}
+
+void TerminalView::setOptionAsAlt(bool enabled)
+{
+    if (std::exchange(m_optionAsAlt, enabled) == enabled)
+        return;
+    resetPreedit();
+    updateInputMethod(Qt::ImEnabled);
+    Q_EMIT optionAsAltChanged();
+}
+
 void TerminalView::encodeKey(QKeyEvent *event)
 {
     if (!m_session || !m_session->terminal()) {
@@ -1235,9 +1319,13 @@ void TerminalView::encodeKey(QKeyEvent *event)
         return;
     }
 
-    const auto output = m_session->terminal()->encodeKey(
-        *event,
-        {.capsLock = m_modifierKeyInfo->isKeyLocked(Qt::Key_CapsLock), .numLock = m_modifierKeyInfo->isKeyLocked(Qt::Key_NumLock)});
+#ifdef Q_OS_MACOS
+    const GhosttyQt::KeyboardLocks locks{.capsLock = bool(event->nativeModifiers() & (1UL << 16))};
+#else
+    const GhosttyQt::KeyboardLocks locks{.capsLock = m_modifierKeyInfo->isKeyLocked(Qt::Key_CapsLock),
+                                         .numLock = m_modifierKeyInfo->isKeyLocked(Qt::Key_NumLock)};
+#endif
+    const auto output = m_session->terminal()->encodeKey(*event, locks, m_optionAsAlt);
 
     if (!output.isEmpty()) {
         m_session->send(output);
@@ -1473,7 +1561,10 @@ void TerminalView::keyReleaseEvent(QKeyEvent *event)
 void TerminalView::resetPreedit()
 {
     // Reset the input context too, or it may commit composition after the overlay is cleared.
-    if (hasActiveFocus() && !m_preedit.isEmpty()) {
+    if (!m_preedit.isEmpty()) {
+        // Cocoa can synchronously commit its marked text during reset. This is
+        // cancellation (focus/session/read-only change), not a user commit.
+        const QScopedValueRollback resetting{m_resettingPreedit, true};
         QGuiApplication::inputMethod()->reset();
     }
 
@@ -1483,7 +1574,8 @@ void TerminalView::resetPreedit()
 
 void TerminalView::inputMethodEvent(QInputMethodEvent *event)
 {
-    if (!m_session || m_session->state() != Session::State::Running || !m_session->terminal() || m_session->isReadOnly() || m_keyboardSelectionMode) {
+    if (m_resettingPreedit || !hasActiveFocus() || !m_session || m_session->state() != Session::State::Running || !m_session->terminal()
+        || m_session->isReadOnly() || m_keyboardSelectionMode) {
         event->accept();
 
         return;
@@ -1569,6 +1661,13 @@ QVariant TerminalView::inputMethodQuery(Qt::InputMethodQuery query) const
 {
     switch (query) {
     case Qt::ImEnabled:
+#ifdef Q_OS_MACOS
+        // Bypass Cocoa composition only for a native Option event in this view's
+        // window. Other keys/IMEs retain the normal input context. Qt queries
+        // ImEnabled before interpreting dead keys, after checking shortcuts.
+        if (m_optionAsAlt && nativeOptionKeyEvent(window()))
+            return false;
+#endif
         return m_session && m_session->state() == Session::State::Running && m_session->terminal() && !m_session->isReadOnly() && !m_keyboardSelectionMode;
     case Qt::ImCursorRectangle: {
         const QPoint caret{GhosttyQt::Quick::layoutPreedit(m_frame, m_preedit, m_preeditAttributes).caret};
@@ -1749,7 +1848,7 @@ void TerminalView::mousePressEvent(QMouseEvent *event)
             m_session->terminal()->cancelSelectionGesture();
 
         if (event->button() == Qt::MiddleButton) {
-            requestPaste(QGuiApplication::clipboard()->text(QClipboard::Selection));
+            pasteSelection();
         } else if (event->button() == Qt::RightButton) {
             Q_EMIT contextMenuRequested(event->position());
         }

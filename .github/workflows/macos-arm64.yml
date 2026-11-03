@@ -1,0 +1,108 @@
+# SPDX-FileCopyrightText: 2026 Kwi contributors
+# SPDX-License-Identifier: CC0-1.0
+name: macOS arm64 build
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+    outputs:
+      commit:
+        description: Commit used to build the package
+        value: ${{ jobs.build.outputs.commit }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 360
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - name: Record source and native toolchain
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "DEVELOPER_DIR=$(xcode-select -p)" >> "$GITHUB_ENV"
+          xcodebuild -version
+          sw_vers
+          df -h .
+      - name: Test build and packaging tools
+        run: python3 -m unittest discover -s tests/macos -v
+      - name: Prepare pinned Craft and limit parallelism for hosted memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/macos/craft.py prepare
+          python3 - <<'PY'
+          import configparser
+          from pathlib import Path
+          path = Path('build-macos/craft-root/etc/CraftSettings.ini')
+          config = configparser.ConfigParser(interpolation=None)
+          config.optionxform = str
+          config.read(path)
+          config['Compile']['Jobs'] = '2'
+          with path.open('w') as stream:
+              config.write(stream)
+          PY
+      - name: Install pinned dependencies
+        run: python3 scripts/macos/craft.py run --install-deps kwi/kwi
+      - name: Record dependency inputs and native targets
+        run: >-
+          python3 scripts/macos/record-dependencies.py
+          --prefix build-macos/craft-root --output build-macos/dependencies.json
+      - name: Configure, compile and install the checked-out port
+        run: |
+          python3 scripts/macos/craft.py run --configure kwi/kwi
+          python3 scripts/macos/craft.py run --make --install --post-install --qmerge --post-qmerge kwi/kwi
+      - name: Run headless native tests
+        run: >-
+          build-macos/craft-root/dev-utils/bin/ctest
+          --test-dir build-macos/craft-root/build/kwi/kwi/work/build
+          -LE gui --output-on-failure
+          --output-junit "$GITHUB_WORKSPACE/build-macos/native-tests.xml"
+      - name: Fully deploy, audit, sign and verify the archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/macos/package.py --output build-macos/package 2>&1 | tee build-macos/package.log
+          mkdir -p build-macos/release-assets
+          cp build-macos/package/Kwi-arm64.zip build-macos/package/package.json \
+            build-macos/package/Kwi.bundle.json build-macos/package/README.txt \
+            build-macos/dependencies.json build-macos/release-assets/
+          cd build-macos/release-assets
+          shasum -a 256 Kwi-arm64.zip > SHA256SUMS
+          shasum -a 256 -c SHA256SUMS
+      - name: Retain release assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: kwi-macos-arm64-${{ steps.source.outputs.commit }}
+          path: build-macos/release-assets/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Retain build diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos-diagnostics-${{ github.run_id }}
+          path: |
+            build-macos/craft-root/logs/
+            build-macos/craft-root/build/kwi/kwi/**/CMakeConfigureLog.yaml
+            build-macos/craft-root/etc/kwi-craft-patch.json
+            build-macos/dependencies.json
+            build-macos/native-tests.xml
+            build-macos/package.log
+          if-no-files-found: ignore
+          retention-days: 14

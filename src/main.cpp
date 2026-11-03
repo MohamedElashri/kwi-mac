@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 
 #include "DesktopIntegration.h"
+#include "Diagnostics_p.h"
 #include "WindowManager.h"
 #include "kwi-config.h"
 #include "kwi-version.h"
@@ -11,7 +12,15 @@
 #include "ui/AppShortcuts.h"
 
 #include <KAboutData>
+#ifdef Q_OS_MACOS
+#include "LocalActivation.h"
+#include "MacLaunch_p.h"
+#include <BreezeIcons>
+#include <KIconTheme>
+#include <unistd.h>
+#else
 #include <KDBusService>
+#endif
 #include <KLocalizedString>
 #include <KirigamiAppDefaults>
 #include <QApplication>
@@ -70,14 +79,33 @@ namespace
 
 int main(int argc, char **argv)
 {
+    const auto processStart{Kwi::traceTime()};
+    const int traceLevel{qEnvironmentVariableIntValue("KWI_TRACE")};
+    const bool tracing{traceLevel == 1 || traceLevel == 2};
+    const auto traceMarker{qEnvironmentVariable("KWI_TRACE_MARKER")};
+    qunsetenv("KWI_TRACE"); // App diagnostics must not leak into child shells.
+    qunsetenv("KWI_TRACE_MARKER");
+#ifdef Q_OS_MACOS
+    KIconTheme::initTheme();
+    BreezeIcons::initIcons();
+#endif
     QQuickWindow::setDefaultAlphaBuffer(true);
+    const auto applicationStart{Kwi::traceTime()};
     QApplication app{argc, argv};
+    app.setProperty("kwiTrace", tracing);
+    app.setProperty("kwiTraceLevel", traceLevel);
+    app.setProperty("kwiTraceMarker", traceMarker);
+    if (tracing) {
+        Kwi::trace(QStringLiteral("startup"), {{QStringLiteral("main_start_ns"), processStart}, {QStringLiteral("application_start_ns"), applicationStart}});
+    }
     KirigamiAppDefaults::apply(&app);
+    Kwi::traceStage(QStringLiteral("kirigami-defaults"));
     QCoreApplication::setApplicationName(QStringLiteral(KWI_EXECUTABLE));
     QCoreApplication::setOrganizationDomain(QStringLiteral(KWI_ORGANIZATION_DOMAIN));
     QGuiApplication::setDesktopFileName(QStringLiteral(KWI_APP_ID));
 
     Kwi::DesktopIntegration::initializeApplicationIcon();
+    Kwi::traceStage(QStringLiteral("application-icon"));
     KLocalizedString::setApplicationDomain("kwi");
 
     KAboutData about{QStringLiteral(KWI_EXECUTABLE),
@@ -119,15 +147,41 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    const auto initialOptions = launchOptions(parser, QDir::currentPath());
+    QString callerDirectory{QDir::currentPath()};
+#ifdef Q_OS_MACOS
+    callerDirectory = Kwi::macLaunchDirectory(callerDirectory, getppid() == 1);
+#endif
+    const auto initialOptions = launchOptions(parser, callerDirectory);
+#ifdef Q_OS_MACOS
+    app.setQuitOnLastWindowClosed(false);
+    Kwi::LocalActivation service;
+    const int activationStatus{service.start(app.arguments(), callerDirectory)};
+    if (activationStatus >= 0) {
+        return activationStatus;
+    }
+#else
     KDBusService service{KDBusService::Unique | KDBusService::NoExitOnFailure};
+#endif
 
+    Kwi::traceStage(QStringLiteral("before-settings"));
     Kwi::TerminalSettings settings{};
+    Kwi::traceStage(QStringLiteral("after-settings"));
     Kwi::TerminalPresets presets{&settings};
+    Kwi::traceStage(QStringLiteral("after-presets"));
     Kwi::AppShortcuts shortcuts{};
+    Kwi::traceStage(QStringLiteral("after-shortcuts"));
     Kwi::TerminalPaletteModel palettes{&settings};
+    Kwi::traceStage(QStringLiteral("after-palettes"));
     Kwi::WindowManager windows{&settings, &presets, &shortcuts, &palettes};
 
+#ifdef Q_OS_MACOS
+    service.activate = [&](const QStringList &arguments, const QString &directory) {
+        if (!parser.parse(arguments) || !commandLineError(parser).isEmpty()) {
+            return 2;
+        }
+        return windows.launch(launchOptions(parser, directory)) ? 0 : 1;
+    };
+#else
     QObject::connect(
         &service,
         &KDBusService::activateRequested,
@@ -143,6 +197,7 @@ int main(int argc, char **argv)
             service.setExitValue(windows.launch(launchOptions(parser, cwd)) ? 0 : 1);
         },
         Qt::DirectConnection);
+#endif
 
     if (!windows.launch(initialOptions)) {
         return 1;

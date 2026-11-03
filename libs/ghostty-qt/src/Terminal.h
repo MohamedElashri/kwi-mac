@@ -181,7 +181,7 @@ public:
     [[nodiscard]] Progress progress() const;
     [[nodiscard]] std::optional<Notification> takeNotification();
 
-    [[nodiscard]] QByteArray encodeKey(const QKeyEvent &event, KeyboardLocks locks = {});
+    [[nodiscard]] QByteArray encodeKey(const QKeyEvent &event, KeyboardLocks locks = {}, bool optionAsAlt = false);
     [[nodiscard]] QByteArray encodeMouse(const MouseEvent &event);
     [[nodiscard]] QByteArray encodeFocus(bool focused) const;
     [[nodiscard]] QByteArray encodePaste(QByteArrayView bytes) const;

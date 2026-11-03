@@ -37,7 +37,7 @@ class CiChangesTest(unittest.TestCase):
         return self.git("rev-parse", "HEAD")
 
     def classify(self, **extra):
-        output = self.root / "step-output"
+        output = self.root / ".git/step-output"
         return subprocess.run([shutil.which("make"), "--no-print-directory", "-f", str(ROOT / "Makefile"), "ci-changes"], cwd=self.root,
                               env={**os.environ, "CI_BASE": self.base, "CI_HEAD": "HEAD", "CI_EVENT": "push", "CI_IS_TAG": "false",
                                    "GITHUB_OUTPUT": str(output), **extra}, capture_output=True, text=True, timeout=15)
@@ -50,7 +50,7 @@ class CiChangesTest(unittest.TestCase):
         result = self.classify()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "build=false")
-        self.assertEqual((self.root / "step-output").read_text(), "build=false\n")
+        self.assertEqual((self.root / ".git/step-output").read_text(), "build=false\n")
 
     def test_source_workflow_and_application_assets_require_native_build(self):
         for filename in ("src/main.cpp", ".github/workflows/checks.yml", "Makefile", "logo.png"):

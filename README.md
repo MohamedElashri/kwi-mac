@@ -18,6 +18,7 @@ with Metal-accelerated rendering powered by libghostty-vt, Qt Quick and KDE Fram
 - **A tabbed workspace:** scrollback, search and keyboard selection.
 - **Your setup:** launch presets, color schemes, fonts and configurable shortcuts.
 - **Mac input:** familiar keyboard shortcuts and optional Option-as-Alt.
+- **Bidirectional text:** Arabic and Persian joining, Hebrew, and mixed-script copy and search.
 
 ## Install
 
@@ -36,6 +37,8 @@ Adjust the path if you installed the app elsewhere.
 
 **⌘T** opens a tab, **⌘F** searches output, and **⌘,** opens settings.
 Enable **Use Option as Alt** under **Behavior** when needed.
+Bidirectional rendering is enabled by default. Under **Terminal → Text direction**,
+turn it off for applications that already arrange RTL text themselves.
 
 ## Build and test
 
@@ -76,12 +79,31 @@ uses `make release` to prepare a draft for review. To prepare one locally, check
 the tag, run `make ci`, then `make release TAG=<tag>`. Downloads include checksums,
 dependency metadata, license notices and matching application/dependency sources.
 
-## Following KDE
+## Maintenance
 
-The original Git history is retained. `make upstream` fetches KDE’s `master` and
-reports unmerged commits; the [upstream workflow](https://github.com/MohamedElashri/kwi-mac/actions/workflows/upstream.yml)
-runs it weekly. Review and merge updates on a separate branch, then build and test
-before merging into `main`.
+This fork maintains its Mac integration and RTL features locally. The main boundaries are:
+
+| Area | Location |
+| --- | --- |
+| Direction-control preservation in libghostty-vt | [Local patch](craft/kwi/libghostty-vt/bidi-controls.patch), covered by protocol tests |
+| Bidi layout, shaping and cell mapping | [Terminal libraries](libs/ghostty-qt-quick/src/), covered by RTL tests |
+| Input, selection, accessibility geometry and settings | [Terminal view](libs/kwi-terminal/src/TerminalView.cpp) and Mac GUI tests |
+
+Keep the VT grid, PTY input, copying and search in logical order. Rendering and
+pointer coordinates share the visual cell maps. The text-direction setting supports
+applications that already arrange RTL text themselves.
+
+The Ghostty patch retains direction controls in cell graphemes and preserves spaces
+with attached grapheme data during selection and formatting. Make applies the patch,
+records its hash and rebuilds the dependency when it changes. Review it whenever Ghostty changes
+cell storage, graphemes, reflow or formatting.
+
+The original Git history is retained. `make upstream` and the weekly
+[upstream workflow](https://github.com/MohamedElashri/kwi-mac/actions/workflows/upstream.yml)
+report KDE changes. Select useful updates on an integration branch and test before
+merging into `main`. Update the Ghostty, Qt and ICU pins separately; run `make test`
+and `make test-gui`, and compare ASCII and mixed RTL performance for rendering or
+dependency updates.
 
 ## License
 

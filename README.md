@@ -6,7 +6,6 @@ SPDX-License-Identifier: CC0-1.0
 # <img src="logo.png" width="32" alt=""/> Kwi for macOS
 
 [![CI](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml)
-[![Release build](https://img.shields.io/github/actions/workflow/status/MohamedElashri/kwi-mac/release.yml?label=release%20build)](https://github.com/MohamedElashri/kwi-mac/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/MohamedElashri/kwi-mac)](https://github.com/MohamedElashri/kwi-mac/releases/latest)
 [![Platform](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple&logoColor=white)](https://github.com/MohamedElashri/kwi-mac/releases/latest)
 [![License](https://img.shields.io/badge/license-GPL%20%2F%20LGPL-blue)](LICENSES/)

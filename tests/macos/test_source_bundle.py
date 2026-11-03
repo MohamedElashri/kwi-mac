@@ -63,6 +63,26 @@ class SourceBundleTest(unittest.TestCase):
             self.assertFalse((destination / "project/COPYING").exists())
             self.assertFalse((destination / "project/code.cpp").exists())
 
+    def test_only_translations_of_shipped_components_are_kept(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "install.db"
+            app = root / "Kwi.app"
+            locale = app / "Contents/Resources/locale/en/LC_MESSAGES"
+            locale.mkdir(parents=True)
+            with sqlite3.connect(database) as db:
+                db.executescript("CREATE TABLE packageList(packageId,packagePath); CREATE TABLE fileList(packageId,filename);")
+                for index, package in enumerate(["kwi/kwi", "libs/example", "dev-utils/compiler"]):
+                    db.execute("INSERT INTO packageList VALUES(?,?)", (index, package))
+                    filename = str(index) + ".mo"
+                    db.execute("INSERT INTO fileList VALUES(?,?)", (index, "share/locale/en/LC_MESSAGES/" + filename))
+                    (locale / filename).write_bytes(b"translation")
+            self.sources.prune_translations(database, app, {"libs/example"})
+            self.assertEqual({path.name for path in locale.iterdir()}, {"0.mo", "1.mo"})
+            (locale / "unknown.mo").write_bytes(b"unattributed")
+            with self.assertRaisesRegex(RuntimeError, "No source package owns translation"):
+                self.sources.prune_translations(database, app, {"libs/example"})
+
     def test_zip_parent_traversal_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

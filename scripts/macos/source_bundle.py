@@ -37,6 +37,24 @@ def runtime_components(database, binaries):
     return required
 
 
+def prune_translations(database, app, packages):
+    """Omit translations installed for build tools and undeployed libraries."""
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as db:
+        rows = db.execute("SELECT p.packagePath,f.filename FROM fileList f JOIN packageList p ON p.packageId=f.packageId WHERE f.filename LIKE 'share/locale/%'").fetchall()
+    owners = {}
+    for package, filename in rows:
+        owners.setdefault(filename, set()).add(package)
+    shipped = set(packages) | {"kwi/kwi"}
+    locale = app / "Contents/Resources/locale"
+    for path in locale.rglob("*"):
+        if path.is_file():
+            relative = "share/locale/" + path.relative_to(locale).as_posix()
+            if relative not in owners:
+                raise RuntimeError(f"No source package owns translation {relative}")
+            if not owners[relative] & shipped:
+                path.unlink()
+
+
 def notice_path(name):
     path = PurePosixPath(name)
     if path.is_absolute() or ".." in path.parts:
@@ -107,6 +125,7 @@ def prepare(prefix, app, output):
     if bootstrap != {"craft": catalog["craft_commit"], "blueprints": catalog["blueprints_commit"]}:
         raise RuntimeError("Build recipe revisions differ from the source catalog")
     selected = [components[name] for name in sorted(installed)]
+    prune_translations(prefix / "etc/blueprints/install.db", app, installed)
     paths = fetch_sources(selected)
     notices = app / "Contents/Resources/licenses/dependencies"
     if notices.exists():
@@ -117,7 +136,8 @@ def prepare(prefix, app, output):
         slug = component["package"].replace("/", "_")
         for index, source in enumerate(component["sources"]):
             notice_count += write_notices(paths[source["sha256"]], notices / slug / str(index))
-        entries.append({**component, "notice_files": notice_count})
+        entries.append({**component, "sources": [{**source, "archive": "dependencies/" + paths[source["sha256"]].name}
+                                                for source in component["sources"]], "notice_files": notice_count})
     commit = bundle.run(["git", "-C", ROOT, "rev-parse", "HEAD"]).strip()
     project_source = output / ".application-source.tar.gz"
     subprocess.run(["git", "-C", str(ROOT), "archive", "--format=tar.gz", "--prefix=kwi/", "--output", str(project_source), commit], check=True)

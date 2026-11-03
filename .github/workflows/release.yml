@@ -45,6 +45,12 @@ jobs:
         run: |
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          version = re.search(r'project\(kwi VERSION ([\d.]+)', Path('CMakeLists.txt').read_text()).group(1)
+          assert os.environ['RELEASE_TAG'].removeprefix('v').split('-mac.')[0] == version, 'Tag must match the CMake project version'
+          PY
 
   build:
     needs: validate

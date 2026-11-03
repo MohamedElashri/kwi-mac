@@ -278,7 +278,7 @@ def main():
         run(["codesign", "--force", "--sign", "-", framework])
     run(["codesign", "--force", "--sign", "-", app])
     run(["codesign", "--verify", "--deep", "--strict", app])
-    manifest = {"signing": "local ad-hoc development only; not Developer ID or notarized", "reused_deployment": args.reuse_deployment, "mach_o": binaries,
+    manifest = {"signing": "ad-hoc; not Developer ID signed or notarized", "reused_deployment": args.reuse_deployment, "mach_o": binaries,
                 "resources": resource_inventory,
                 "files": {p.relative_to(app).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                           for p in app.rglob("*") if p.is_file() and not p.is_symlink()}}

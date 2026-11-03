@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Kwi contributors
 # SPDX-License-Identifier: CC0-1.0
-"""Build and verify a complete local arm64 development package before publishing it."""
+"""Build and verify an arm64 application package with matching sources and notices."""
 import argparse
 import datetime
 import hashlib
@@ -85,7 +85,15 @@ def main():
         # Final packages always rediscover the complete Qt/QML/plugin closure.
         subprocess.run([sys.executable, str(ROOT / "scripts/macos/bundle.py"), "--prefix", str(args.prefix.resolve()), "--output", str(app)],
                        check=True, env=bundle.tool_environment(), timeout=1200)
+        import source_bundle
+        source_distribution = source_bundle.prepare(args.prefix.resolve(), app, staged)
+        bundle.run(["codesign", "--force", "--sign", "-", app])
         bundle.run(["codesign", "--verify", "--deep", "--strict", app])
+        manifest_path = staged / "Kwi.bundle.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["resources"] = bundle.inventory_resources(app)
+        manifest["files"] = {p.relative_to(app).as_posix(): digest(p) for p in app.rglob("*") if p.is_file() and not p.is_symlink()}
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
         archive = staged / "Kwi-arm64.zip"
         bundle.run(["/usr/bin/ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, archive])
         extracted = work / "Extracted Kwi-é"
@@ -97,25 +105,25 @@ def main():
         native = bundle.audit(restored)
         resources = bundle.inventory_resources(restored)
         (staged / "README.txt").write_text(
-            "Kwi: local Apple Silicon development build\n\n"
+            "Kwi for macOS — Apple Silicon\n\n"
             "Open Kwi.app, or copy it to a location on this Mac. Keep the app bundle intact.\n"
             "The ZIP contains the same verified app. No Craft shell or loader/QML environment overrides are needed.\n"
-            "Signing is ad-hoc for local development; Developer ID/notarization and public redistribution are not verified.\n"
+            "Ad-hoc signed; Developer ID signing and notarization are not configured.\n"
             "Installed license notices are in Kwi.app/Contents/Resources/licenses.\n"
-            "Public distribution requires a separate dependency notice/source-obligation review.\n")
+            "Kwi-sources.tar.gz includes application, dependency and build recipe sources; SOURCES.json maps versions and archives.\n")
         record = {"owner": OWNER, "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                  "scope": "Local Apple Silicon development; public release verification is separate",
+                  "scope": "Apple Silicon macOS application package",
                   "full_deployment": True, "strict_signatures_original_and_extracted": True,
                   "archive_round_trip_bytes_modes_symlinks": True, "mach_o_files": len(native),
                   "archive": {"name": archive.name, "sha256": digest(archive), "bytes": archive.stat().st_size},
                   "executable_sha256": digest(app / "Contents/MacOS/kwi"), "resources": resources,
                   "bundle_manifest_sha256": digest(staged / "Kwi.bundle.json"),
                   "source": json.loads((app / "Contents/Resources/kwi-bundle.json").read_text()),
-                  "public_notice_and_source_closure_verified": False,
+                  "source_distribution": source_distribution, "notarized": False,
                   "published_files": snapshot(staged)}
         (staged / "package.json").write_text(json.dumps(record, indent=2) + "\n")
         publish(staged, destination)
-    print(f"Verified local package: {destination}", flush=True)
+    print(f"Verified package: {destination}", flush=True)
 
 
 if __name__ == "__main__":

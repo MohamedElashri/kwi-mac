@@ -41,6 +41,8 @@ jobs:
           df -h .
       - name: Test build and packaging tools
         run: python3 -m unittest discover -s tests/macos -v
+      - name: Fetch and verify corresponding dependency sources
+        run: python3 scripts/macos/source_bundle.py
       - name: Prepare pinned Craft and limit parallelism for hosted memory
         shell: bash
         run: |
@@ -81,9 +83,11 @@ jobs:
           mkdir -p build-macos/release-assets
           cp build-macos/package/Kwi-arm64.zip build-macos/package/package.json \
             build-macos/package/Kwi.bundle.json build-macos/package/README.txt \
+            build-macos/package/Kwi-sources.tar.gz build-macos/package/SOURCES.json \
             build-macos/dependencies.json build-macos/release-assets/
           cd build-macos/release-assets
-          shasum -a 256 Kwi-arm64.zip > SHA256SUMS
+          shasum -a 256 Kwi-arm64.zip Kwi-sources.tar.gz SOURCES.json package.json \
+            Kwi.bundle.json README.txt dependencies.json > SHA256SUMS
           shasum -a 256 -c SHA256SUMS
       - name: Retain release assets
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -91,7 +95,7 @@ jobs:
           name: kwi-macos-arm64-${{ steps.source.outputs.commit }}
           path: build-macos/release-assets/
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 3
       - name: Retain build diagnostics
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

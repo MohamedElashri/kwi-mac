@@ -3,76 +3,67 @@ SPDX-FileCopyrightText: 2026 Eike Hein <hein@kde.org>
 SPDX-FileCopyrightText: 2026 Mohamed Elashri <mail@elashri.com>
 SPDX-License-Identifier: CC0-1.0
 -->
-# <img src="logo.png" width="32"/> Kwi for macOS
+# <img src="logo.png" width="32" alt=""/> Kwi for macOS
 
-An Apple Silicon port of [KDE Kwi](https://invent.kde.org/utilities/kwi), built
-with libghostty-vt, Qt Quick/Metal and KDE Frameworks. Includes native Mac
-shortcuts, tabs, presets, color schemes, search and a 14 pt default terminal font.
-This repository targets macOS; it is an independent port, not an official KDE release.
+[![CI](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml)
+[![Release build](https://img.shields.io/github/actions/workflow/status/MohamedElashri/kwi-mac/release.yml?label=release%20build)](https://github.com/MohamedElashri/kwi-mac/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/MohamedElashri/kwi-mac)](https://github.com/MohamedElashri/kwi-mac/releases/latest)
+[![Platform](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple&logoColor=white)](https://github.com/MohamedElashri/kwi-mac/releases/latest)
+[![License](https://img.shields.io/badge/license-GPL%20%2F%20LGPL-blue)](LICENSES/)
+
+An Apple Silicon port of [KDE Kwi](https://invent.kde.org/utilities/kwi), powered
+by libghostty-vt, Qt Quick and KDE Frameworks, with Metal-accelerated rendering.
+
+- Tabs, retained output, search and keyboard selection.
+- Launch presets, color schemes and customizable shortcuts.
+- Mac keyboard handling, with optional Option-as-Alt.
 
 ## Install
 
-Download an arm64 ZIP from [Releases](https://github.com/MohamedElashri/kwi-mac/releases),
-extract it, and copy `Kwi.app` to Applications. Development builds are ad-hoc
-signed; Developer ID signing and notarization are not configured. The binary
-deployment floor is macOS 14.4; runtime validation has been on an M1 with macOS 27.2.
+Download `Kwi-arm64.zip` from the [latest release](https://github.com/MohamedElashri/kwi-mac/releases/latest),
+extract it, and move `Kwi.app` to Applications. See the release notes for system
+requirements and signing information. Builds are currently ad-hoc signed and
+are not notarized; macOS may require approval before opening them.
 
-Use **Command–,** for settings. **Use Option as Alt** is available in Behavior.
-IME, other keyboard layouts/displays and VoiceOver still need broader verification.
+**⌘T** opens a tab, **⌘F** searches output, and **⌘,** opens settings.
+Option-as-Alt is available under **Behavior**.
 
-## Build and test
+## Build
 
-Requires native Apple Silicon, full Xcode, Git and Python 3.11+. Craft installs
-the pinned dependencies into `build-macos/craft-root`, without using Homebrew libraries.
+Use an Apple Silicon Mac with full Xcode, Git and Python 3.11 or later. Dependency
+versions are pinned in the build scripts; Craft manages a project-local prefix.
 
 ```sh
-export DEVELOPER_DIR="$(xcode-select -p)" # Must point to full Xcode, not Command Line Tools
+export DEVELOPER_DIR="$(xcode-select -p)"
 python3 scripts/macos/craft.py prepare
 python3 scripts/macos/craft.py run --install-deps kwi/kwi
 python3 scripts/macos/craft.py run --configure kwi/kwi
 python3 scripts/macos/craft.py run --make --install --post-install --qmerge --post-qmerge kwi/kwi
-python3 -m unittest discover -s tests/macos -v
-build-macos/craft-root/dev-utils/bin/ctest \
-  --test-dir build-macos/craft-root/build/kwi/kwi/work/build -LE gui --output-on-failure
 python3 scripts/macos/package.py --output build-macos/package
 open build-macos/package/Kwi.app
 ```
 
-For native GUI checks, generate fixtures with `python3 scripts/macos/workloads.py`,
-then run CTest without `-LE gui` in a logged-in Mac session with the test windows
-left focused. The interaction suite includes a repeatable settings/action audit.
-Build output and local reports are ignored. Dependency pins live in
-`scripts/macos/craft.py` and `craft/`; the original upstream libraries remain in `libs/`.
+`DEVELOPER_DIR` must point to full Xcode, not Command Line Tools. Run tooling tests
+with `python3 -m unittest discover -s tests/macos -v`. Native tests use CTest in
+`build-macos/craft-root/build/kwi/kwi/work/build`; `-LE gui` selects headless checks.
+For GUI checks, first run `python3 scripts/macos/workloads.py` and keep the test
+windows focused in a logged-in Mac session.
+Commit local changes before packaging so the source archive matches the build.
 
-## Releases
+## Development
 
-**Actions → macOS release** builds an existing `v0.1.0-mac.1`-style tag, or push
-such a tag to start it. The workflow tests, fully deploys, audits and packages
-arm64, then creates a **draft prerelease** with the ZIP, SHA-256 checksums and
-source/dependency metadata. Review the draft before publishing. Hosted CI runs
-the headless tests; local GUI/Metal checks remain separate. No Apple secrets are needed
-for the current ad-hoc builds.
+This is an independent macOS port. KDE's original Git history is retained, and
+[upstream tracking](https://github.com/MohamedElashri/kwi-mac/actions/workflows/upstream.yml)
+reports new changes weekly. Fetch KDE's `master` through an `upstream` remote,
+merge updates on a review branch, and build/test before merging into `main`.
 
-## Following upstream
-
-`origin` is this port; `upstream` is KDE Kwi. The original Git history is retained,
-and the weekly **Track upstream Kwi** workflow reports commits not yet merged.
-Update on a review branch, build/test, then merge it into `main`:
-
-```sh
-git remote add upstream https://invent.kde.org/utilities/kwi.git # Once per clone
-git fetch upstream
-git switch -c sync/kwi
-git merge upstream/master
-```
-
-The macOS changes are ordinary commits carried alongside upstream development;
-there is no separate patch queue. Shared terminal fixes can be contributed to KDE.
+Version tags start the [release workflow](https://github.com/MohamedElashri/kwi-mac/actions/workflows/release.yml),
+which tests and packages arm64 builds and prepares a draft for publication.
+Downloads include checksums, dependency metadata and source information.
 
 ## License
 
 The application is GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL;
-the embedded terminal libraries are LGPL-2.1-only OR LGPL-3.0-only OR
-LicenseRef-KDE-Accepted-LGPL. Konsole palettes are GPL-2.0-or-later. Original
-copyrights, [license texts](LICENSES/) and [palette attribution](libs/kwi-terminal/data/color-schemes/NOTICE)
-are retained; bundled dependency notices are included inside the app.
+the terminal libraries are LGPL-2.1-only OR LGPL-3.0-only OR
+LicenseRef-KDE-Accepted-LGPL. Konsole palettes are GPL-2.0-or-later. See
+[license texts](LICENSES/) and [palette attribution](libs/kwi-terminal/data/color-schemes/NOTICE).

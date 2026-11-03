@@ -68,7 +68,7 @@ def main():
             if (parts + (0,) * (3 - len(parts))) > floor:
                 problems.append(name + ": requires macOS " + version)
     root = Path(__file__).resolve().parents[2]
-    local_inputs = [*root.glob("scripts/macos/*.py"), *root.glob("craft/**/*.py"), root / "craft/ghostty-sources.json",
+    local_inputs = [*root.glob("scripts/macos/*.py"), *root.glob("craft/**/*.py"), *root.glob("craft/*.json"),
                     root / ".github/workflows/macos-arm64.yml"]
     result = {
         "status": "installed dependency snapshot; not a runtime or minimum-OS test",

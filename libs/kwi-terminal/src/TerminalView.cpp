@@ -356,6 +356,7 @@ void TerminalView::changeSession(Session *newSession)
     m_selectionTextDirty = false;
     m_zoom = m_session ? m_session->zoomOffset() : 0;
     m_frame = {};
+    m_bidi.update(m_frame);
     m_searchMatches = {};
     m_hasBlinkingText = false;
     updateBlinkTimers();
@@ -667,6 +668,7 @@ void TerminalView::updatePolish()
         }
     }
     if (captured) {
+        m_bidi.update(m_frame, m_bidirectionalText);
         m_searchMatches = m_search->viewportMatches(previousOffset != m_frame.scrollOffset);
         ++m_frameRevision;
 
@@ -877,12 +879,24 @@ QSGNode *TerminalView::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
     options.textBlinkVisible = m_textBlinkVisible;
     options.preedit = m_preedit;
     options.preeditAttributes = m_preeditAttributes;
-    options.searchMatches = m_searchMatches;
-    options.hoveredLink = m_highlightedLink;
+    options.bidiRows = m_bidi.rows();
+    options.searchMatches = m_bidi.visualRegion(m_searchMatches);
+    options.hoveredLink = m_bidi.visualRegion(m_highlightedLink);
     const QPalette palette{QGuiApplication::palette()};
     options.searchForeground = palette.color(QPalette::Active, QPalette::Text);
     options.searchBackground = KColorUtils::mix(palette.color(QPalette::Active, QPalette::Base), palette.color(QPalette::Active, QPalette::Highlight), 0.35);
-    node->synchronize(m_frame, options);
+    if (m_bidirectionalText && !m_preedit.isEmpty()) {
+        const auto composed = GhosttyQt::Quick::frameWithPreedit(m_frame, GhosttyQt::Quick::layoutPreedit(m_frame, m_preedit, m_preeditAttributes));
+        GhosttyQt::Quick::BidiLayout bidi;
+        bidi.update(composed);
+        options.bidiRows = bidi.rows();
+        options.searchMatches = bidi.visualRegion(m_searchMatches);
+        options.hoveredLink = bidi.visualRegion(m_highlightedLink);
+        options.composedPreedit = true;
+        node->synchronize(bidi.visualFrame(composed), options);
+    } else {
+        node->synchronize(m_bidi.visualFrame(m_frame), options);
+    }
 
     return node;
 }
@@ -1293,6 +1307,35 @@ void TerminalView::scrollHistory(QPoint pixelDelta, QPoint angleDelta, Qt::Keybo
     }
 }
 
+bool TerminalView::bidirectionalText() const
+{
+    return m_bidirectionalText;
+}
+
+void TerminalView::setBidirectionalText(bool enabled)
+{
+    if (m_bidirectionalText == enabled)
+        return;
+    m_bidirectionalText = enabled;
+    m_bidi.update(m_frame, enabled);
+    ++m_frameRevision;
+    updateInputMethod(Qt::ImCursorRectangle);
+    updateAccessibility();
+    update();
+    Q_EMIT bidirectionalTextChanged();
+    Q_EMIT keyboardSelectionChanged();
+}
+
+QRectF TerminalView::logicalCellRectangle(QPoint cell) const
+{
+    const QPoint logical = glyphStart(cell);
+    int width = 1;
+    if (logical.y() >= 0 && logical.y() < m_frame.rows.size() && logical.x() >= 0 && logical.x() < m_frame.rows[logical.y()].size())
+        width = qMax(1, int(m_frame.rows[logical.y()][logical.x()].width));
+    const QPoint visual = m_bidi.visualCell(logical);
+    return QRectF(m_padding + visual.x() * m_cellWidth, m_padding + visual.y() * m_cellHeight, width * m_cellWidth, m_cellHeight);
+}
+
 bool TerminalView::optionAsAlt() const
 {
     return m_optionAsAlt;
@@ -1370,7 +1413,8 @@ QRectF TerminalView::selectionCursorRectangle() const
         width = qMax(1, int(m_frame.rows[cell.y()][cell.x()].width));
     }
 
-    return QRectF(m_padding + cell.x() * m_cellWidth, m_padding + cell.y() * m_cellHeight, width * m_cellWidth, m_cellHeight);
+    const QPoint visual = m_bidi.visualCell(cell);
+    return QRectF(m_padding + visual.x() * m_cellWidth, m_padding + visual.y() * m_cellHeight, width * m_cellWidth, m_cellHeight);
 }
 
 void TerminalView::toggleSelectionMode()
@@ -1393,6 +1437,7 @@ void TerminalView::setKeyboardSelectionMode(bool enabled)
         const QPoint cell{qBound(0, m_frame.cursor.x(), m_frame.columns - 1), qBound(0, m_frame.cursor.y(), int(m_frame.rows.size()) - 1)};
         m_session->terminal()->select(cell, cell, false);
         m_keyboardCursor = glyphStart(cell);
+        m_keyboardAnchor = m_keyboardCursor;
 
         forceActiveFocus();
     }
@@ -1435,6 +1480,40 @@ bool TerminalView::handleSelectionKey(QKeyEvent *event)
         event->ignore();
 
         return true;
+    }
+
+    const QPoint visual = m_bidi.visualCell(m_keyboardCursor);
+    const bool visualNavigation = !m_bidi.rows().value(visual.y()).logicalToVisual.isEmpty()
+        || ((key == Qt::Key_Up || key == Qt::Key_Down) && !m_bidi.rows().value(visual.y() + (key == Qt::Key_Up ? -1 : 1)).logicalToVisual.isEmpty());
+    if (visualNavigation
+        && (key == Qt::Key_Left || key == Qt::Key_Right || key == Qt::Key_Up || key == Qt::Key_Down
+            || ((key == Qt::Key_Home || key == Qt::Key_End) && !event->modifiers().testFlag(Qt::ControlModifier)))) {
+        QPoint next = visual;
+        if (key == Qt::Key_Left)
+            --next.rx();
+        if (key == Qt::Key_Right)
+            next.rx() += qMax(1, int(m_frame.rows[m_keyboardCursor.y()][qBound(0, m_keyboardCursor.x(), m_frame.columns - 1)].width));
+        if (key == Qt::Key_Up)
+            --next.ry();
+        if (key == Qt::Key_Down)
+            ++next.ry();
+        if (key == Qt::Key_Home)
+            next.setX(0);
+        if (key == Qt::Key_End)
+            next.setX(m_frame.columns - 1);
+        if (next.x() < 0)
+            next = {m_frame.columns - 1, next.y() - 1};
+        if (next.x() >= m_frame.columns)
+            next = {0, next.y() + 1};
+        if (next.y() >= 0 && next.y() < m_frame.rows.size()) {
+            m_keyboardCursor = glyphStart(m_bidi.logicalCell(next));
+            if (!event->modifiers().testFlag(Qt::ShiftModifier))
+                m_keyboardAnchor = m_keyboardCursor;
+            m_session->terminal()->select(m_keyboardAnchor, m_keyboardCursor);
+            Q_EMIT keyboardSelectionChanged();
+            event->accept();
+            return true;
+        }
     }
 
     using Adjustment = GhosttyQt::SelectionAdjustment;
@@ -1493,7 +1572,8 @@ bool TerminalView::handleSelectionKey(QKeyEvent *event)
 
     if (m_keyboardCursor != *next) {
         m_keyboardCursor = *next;
-
+        if (!event->modifiers().testFlag(Qt::ShiftModifier))
+            m_keyboardAnchor = m_keyboardCursor;
         Q_EMIT keyboardSelectionChanged();
     }
 
@@ -1670,8 +1750,13 @@ QVariant TerminalView::inputMethodQuery(Qt::InputMethodQuery query) const
 #endif
         return m_session && m_session->state() == Session::State::Running && m_session->terminal() && !m_session->isReadOnly() && !m_keyboardSelectionMode;
     case Qt::ImCursorRectangle: {
-        const QPoint caret{GhosttyQt::Quick::layoutPreedit(m_frame, m_preedit, m_preeditAttributes).caret};
-
+        const auto preedit = GhosttyQt::Quick::layoutPreedit(m_frame, m_preedit, m_preeditAttributes);
+        QPoint caret = m_bidi.visualCell(preedit.caret);
+        if (m_bidirectionalText && !m_preedit.isEmpty()) {
+            GhosttyQt::Quick::BidiLayout bidi;
+            bidi.update(GhosttyQt::Quick::frameWithPreedit(m_frame, preedit));
+            caret = bidi.visualCell(preedit.caret);
+        }
         return QRectF(m_padding + caret.x() * m_cellWidth, m_padding + caret.y() * m_cellHeight, m_cellWidth, m_cellHeight);
     }
     case Qt::ImFont:
@@ -1690,8 +1775,8 @@ QVariant TerminalView::inputMethodQuery(Qt::InputMethodQuery query) const
 
 QPoint TerminalView::cellAt(QPointF position) const
 {
-    return {qBound(0, int((position.x() - m_padding) / m_cellWidth), qMax(0, m_frame.columns - 1)),
-            qBound(0, int((position.y() - m_padding) / m_cellHeight), qMax(0, int(m_frame.rows.size()) - 1))};
+    return m_bidi.logicalCell({qBound(0, int((position.x() - m_padding) / m_cellWidth), qMax(0, m_frame.columns - 1)),
+                               qBound(0, int((position.y() - m_padding) / m_cellHeight), qMax(0, int(m_frame.rows.size()) - 1))});
 }
 
 void TerminalView::updateSelection(GhosttyQt::SelectionEvent::Type type, QPointF position, quint64 timestamp)
@@ -1700,12 +1785,57 @@ void TerminalView::updateSelection(GhosttyQt::SelectionEvent::Type type, QPointF
         return;
     }
 
+    if (m_selectionRectangle && m_bidirectionalText) {
+        const QPoint visual = m_bidi.visualCell(cellAt(position));
+        if (type == GhosttyQt::SelectionEvent::Type::Press) {
+            m_rectangleAnchor = visual;
+            m_rectangleAnchorOffset = m_frame.scrollOffset;
+        }
+        const qint64 anchor = m_rectangleAnchorOffset + m_rectangleAnchor.y();
+        const qint64 endpoint = qint64(m_frame.scrollOffset) + visual.y();
+        const qint64 first = qMin(anchor, endpoint);
+        const qint64 last = qMax(anchor, endpoint);
+        const int left = qMin(m_rectangleAnchor.x(), visual.x());
+        const int right = qMax(m_rectangleAnchor.x(), visual.x());
+        QRegion logical;
+        for (qint64 screenRow = qMax(first, qint64(m_frame.scrollOffset)); screenRow <= qMin(last, qint64(m_frame.scrollOffset + m_frame.rows.size() - 1));
+             ++screenRow)
+            for (int x = left; x <= right; ++x) {
+                const QPoint cell = glyphStart(m_bidi.logicalCell({x, int(screenRow - m_frame.scrollOffset)}));
+                const int width = qMax(1, int(m_frame.rows[cell.y()][cell.x()].width));
+                logical += QRect(cell, QSize(width, 1));
+            }
+        m_session->terminal()->selectCells(logical, first, last);
+        m_selectionPointer = position;
+        const qreal bottom = m_padding + m_frame.rows.size() * m_cellHeight;
+        const int scroll = position.y() < m_padding ? -1 : position.y() >= bottom ? 1 : 0;
+        if (scroll && type != GhosttyQt::SelectionEvent::Type::Release) {
+            m_session->terminal()->scroll(scroll);
+            if (!m_selectionScrollTimer.isActive())
+                m_selectionScrollTimer.start(30);
+        } else {
+            m_selectionScrollTimer.stop();
+        }
+        return;
+    }
+
     m_selectionPointer = position;
     const qreal dpr{window() ? window()->effectiveDevicePixelRatio() : 1};
+    const QPoint logicalCell = cellAt(position);
+    const QPoint visualCell = m_bidi.visualCell(logicalCell);
+    QPointF logicalPosition = position - QPointF(m_padding, m_padding);
+    qreal fraction = logicalPosition.x() / m_cellWidth - visualCell.x();
+    const auto &levels = m_bidi.rows().value(logicalCell.y()).levels;
+    if (logicalCell.x() >= 0 && logicalCell.x() < levels.size() && (levels[logicalCell.x()] & 1))
+        fraction = 1 - fraction;
+    // Keep a pointer exactly on the RTL cell edge inside that cell's last
+    // physical pixel rather than wrapping the native selection fraction to zero.
+    fraction = qBound(qreal(0), fraction, qreal(1) - qreal(0.5) / (m_cellWidth * dpr));
+    logicalPosition.setX((logicalCell.x() + fraction) * m_cellWidth);
     m_session->terminal()->selectionGesture({
         .type = type,
-        .cell = cellAt(position),
-        .position = (position - QPointF(m_padding, m_padding)) * dpr,
+        .cell = logicalCell,
+        .position = logicalPosition * dpr,
         .timestamp = timestamp,
         .repeatInterval = qGuiApp->styleHints()->mouseDoubleClickInterval(),
         .repeatDistance = qRound(qGuiApp->styleHints()->mouseDoubleClickDistance() * dpr),
@@ -1737,6 +1867,9 @@ void TerminalView::sendMouse(GhosttyQt::MouseEvent event)
         return;
 
     const qreal dpr{window() ? window()->effectiveDevicePixelRatio() : 1};
+    const QPoint logical = cellAt(event.position);
+    const QPoint visual = m_bidi.visualCell(logical);
+    event.position.rx() += (logical.x() - visual.x()) * m_cellWidth;
     event.position = (event.position - QPointF(m_padding, m_padding)) * dpr;
     event.cellSize = QSizeF(m_cellWidth * dpr, m_cellHeight * dpr);
     event.size = QSizeF(m_frame.columns * m_cellWidth * dpr, m_frame.rows.size() * m_cellHeight * dpr);

@@ -292,6 +292,30 @@ SettingsPage {
         }
 
         Forms.FormGroup {
+            title: KI18n.i18nc("@title:group", "Text direction")
+
+            Forms.FormEntry {
+                contentItem: Controls.CheckBox {
+                    objectName: "bidirectionalText"
+                    text: KI18n.i18nc("@option:check", "Display Arabic, Persian and Hebrew in reading order")
+                    enabled: !root.appSettings.isBidirectionalTextImmutable
+                    checked: root.appSettings.bidirectionalText
+                    onToggled: {
+                        root.appSettings.bidirectionalText = checked;
+                        root.appSettings.save();
+                    }
+                }
+            }
+            Forms.FormEntry {
+                contentItem: Controls.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: KI18n.i18nc("@info", "Turn this off for applications that already arrange right-to-left text themselves.")
+                }
+            }
+        }
+
+        Forms.FormGroup {
             title: KI18n.i18nc("@title:group", "Scrollback")
 
             Forms.FormEntry {

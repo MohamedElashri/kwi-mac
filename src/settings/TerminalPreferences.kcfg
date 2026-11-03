@@ -34,6 +34,9 @@
         </entry>
     </group>
     <group name="Terminal">
+        <entry name="bidirectionalText" key="BidirectionalText" type="Bool">
+            <default>true</default>
+        </entry>
         <entry name="scrollbackLines" key="ScrollbackLines" type="Int">
             <default>-1</default>
             <max>SettingsConstraints::MaximumScrollbackLines</max>

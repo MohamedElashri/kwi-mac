@@ -200,6 +200,7 @@ private Q_SLOTS:
         m_settings->setFontPointSize(10);
         m_settings->setCursorBlinking(false);
         m_settings->setOptionAsAlt(false);
+        m_settings->setBidirectionalText(true);
         QVERIFY(launch());
         QTRY_VERIFY_WITH_TIMEOUT(m_session->historyText().contains(QLatin1String("KWI_INPUT_READY")), 5000);
         QTRY_VERIFY(m_view->hasActiveFocus());
@@ -252,6 +253,78 @@ private Q_SLOTS:
         QTest::qWait(150);
         nativeKey(13, QStringLiteral("w"), QStringLiteral("w"), Qt::ControlModifier);
         QTRY_COMPARE(model->count(), 1);
+    }
+
+    void bidirectionalText()
+    {
+        m_settings->setBidirectionalText(true);
+        m_settings->setFontPointSize(14);
+        m_window->resize(1000, 650);
+        m_session->setCustomTitle(QStringLiteral("Bidirectional text"));
+        m_session->feed(QStringLiteral("\033[2J\033[Habc שלום 123\r\n"
+                                       "Arabic:  السلام عليكم — السَّلَامُ عَلَيْكُمْ\r\n"
+                                       "Persian: فارسی می‌نویسم؛ یک کتاب ۱۲۳\r\n"
+                                       "Hebrew:  שָׁלוֹם עוֹלָם (123)\r\n"
+                                       "Mixed:   build مرحبا 123 (test) שלום ✓\r\n"
+                                       "Isolate: \u2067العربية 123 (abc)\u2069 end\r\n"
+                                       "Styles:  \033[31mسلا\033[32mم بالعالم\033[0m\r\n"
+                                       "Wide:    مرحبا 😀 中文 שלום\r\n"
+                                       "\033[1;1H")
+                            .toUtf8());
+        QTRY_VERIFY(m_session->historyText().contains(QStringLiteral("فارسی")));
+        QTRY_VERIFY(m_view->bidirectionalText());
+        QTest::qWait(150);
+        const auto first = m_view->inputMethodQuery(Qt::ImCursorRectangle).toRectF();
+        const qreal cw = first.width();
+        m_session->feed("\033[1;5H"); // Logical first Hebrew letter appears at visual column 11.
+        QTRY_VERIFY(qAbs(m_view->inputMethodQuery(Qt::ImCursorRectangle).toRectF().x() - first.x() - 11 * cw) < 1);
+        QAccessible::setActive(true);
+        auto *accessible = QAccessible::queryAccessibleInterface(m_view);
+        QVERIFY(accessible && accessible->textInterface());
+        auto *text = accessible->textInterface();
+        QVERIFY(text->text(0, -1).startsWith(QStringLiteral("abc שלום 123")));
+        const auto hebrewRect = text->characterRect(4);
+        const auto digitRect = text->characterRect(9);
+        QVERIFY(hebrewRect.left() > digitRect.left());
+        QCOMPARE(text->offsetAtPoint(hebrewRect.center()), 4);
+        // Mouse endpoints are visual; the copied result remains in logical order.
+        const auto cell = [&](qreal x, int y = 0) {
+            return m_view->mapToScene(QPointF(first.x() + x * cw, first.y() + (y + 0.5) * first.height())).toPoint();
+        };
+        QTest::mousePress(m_window, Qt::LeftButton, Qt::NoModifier, cell(11.9));
+        QTest::mouseMove(m_window, cell(8.0), 60);
+        QTest::mouseRelease(m_window, Qt::LeftButton, Qt::NoModifier, cell(8.0));
+        QTRY_COMPARE(m_view->selectedText(), QStringLiteral("שלום"));
+        m_view->copy();
+        QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("שלום"));
+        m_view->setKeyboardSelectionMode(true);
+        QTRY_VERIFY(qAbs(m_view->selectionCursorRectangle().x() - first.x() - 11 * cw) < 1);
+        QTest::keyClick(m_window, Qt::Key_Left);
+        QTRY_VERIFY(qAbs(m_view->selectionCursorRectangle().x() - first.x() - 10 * cw) < 1);
+        QTest::keyClick(m_window, Qt::Key_Left, Qt::ShiftModifier);
+        QTRY_COMPARE(m_view->selectedText(), QStringLiteral("לו"));
+        m_view->setKeyboardSelectionMode(false);
+        QTest::mousePress(m_window, Qt::LeftButton, Qt::ControlModifier | Qt::AltModifier, cell(6.1));
+        QTest::mouseMove(m_window, cell(9.9), 60);
+        QTest::mouseRelease(m_window, Qt::LeftButton, Qt::ControlModifier | Qt::AltModifier, cell(9.9));
+        QTRY_COMPARE(m_view->selectedText(), QStringLiteral("ום 3"));
+        m_view->find(QStringLiteral("שלום"));
+        QTRY_VERIFY(!m_view->isSearchBusy());
+        QVERIFY(!m_view->searchStatus().isEmpty());
+        m_view->clearSearch();
+        m_settings->setBidirectionalText(false);
+        QTRY_VERIFY(!m_view->bidirectionalText());
+        QTRY_VERIFY(qAbs(m_view->inputMethodQuery(Qt::ImCursorRectangle).toRectF().x() - first.x() - 4 * cw) < 1);
+        m_settings->setBidirectionalText(true);
+        QTRY_VERIFY(m_view->bidirectionalText());
+        m_session->feed("\033[10;1Hcompose> ");
+        setMacTestPreedit(m_window, QStringLiteral("سلام"));
+        QTest::qWait(150);
+        QVERIFY(received().isEmpty());
+        screenshot(QStringLiteral("bidirectional-text"));
+        commitMacTestText(m_window, QStringLiteral("سلام فارسی שלום"));
+        QTRY_COMPARE(received(), QStringLiteral("سلام فارسی שלום").toUtf8());
+        m_settings->setBidirectionalText(true);
     }
 
     void readmeScreenshot()
@@ -415,7 +488,7 @@ private Q_SLOTS:
                               QStringLiteral("optionAsAltSetting"),
                               QStringLiteral("requireCtrlForLinksSetting")};
             } else if (module == QLatin1String("terminal")) {
-                checkboxes = {QStringLiteral("windowTitleFromApplication"), QStringLiteral("cursorBlinkingSetting")};
+                checkboxes = {QStringLiteral("windowTitleFromApplication"), QStringLiteral("cursorBlinkingSetting"), QStringLiteral("bidirectionalText")};
                 combos = {QStringLiteral("scrollbackMode"), QStringLiteral("cursorStyleSetting")};
                 spins = {QStringLiteral("scrollbackLines"), QStringLiteral("silenceInterval")};
                 for (const QString name : {QStringLiteral("titleFormatField"), QStringLiteral("remoteTitleFormatField")}) {

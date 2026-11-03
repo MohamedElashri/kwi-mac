@@ -423,11 +423,8 @@ public:
         }
 
         const QPoint cell{cellForOffset(offset)};
-        const auto &native = view()->m_frame.rows.at(cell.y()).at(cell.x());
-        const QPointF start(view()->m_padding + cell.x() * view()->m_cellWidth, view()->m_padding + cell.y() * view()->m_cellHeight);
-        const QPointF end{start + QPointF(qMax(1, int(native.width)) * view()->m_cellWidth, view()->m_cellHeight)};
-
-        return QRectF(view()->mapToGlobal(start), view()->mapToGlobal(end)).normalized().toAlignedRect();
+        const auto local = view()->logicalCellRectangle(cell);
+        return QRectF(view()->mapToGlobal(local.topLeft()), view()->mapToGlobal(local.bottomRight())).normalized().toAlignedRect();
     }
 
     int offsetAtPoint(const QPoint &point) const override

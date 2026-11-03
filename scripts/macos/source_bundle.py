@@ -84,8 +84,12 @@ def fetch_sources(components):
     sources = {source["sha256"]: source for entry in components for source in entry["sources"]}
     cache = ROOT / "build-macos/release-source-cache"
     cache.mkdir(parents=True, exist_ok=True)
+    def verified(source):
+        path = fetch(source, cache)
+        print(f"Verified source: {source['url']}", flush=True)
+        return path
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        paths = dict(zip(sources, pool.map(lambda source: fetch(source, cache), sources.values())))
+        paths = dict(zip(sources, pool.map(verified, sources.values())))
     print(f"Verified {len(paths)} source archives", flush=True)
     return paths
 

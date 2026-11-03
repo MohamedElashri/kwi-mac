@@ -7,7 +7,7 @@
       "version": "6.31.0-1",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/breeze-icons-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/breeze-icons-6.31.0.tar.xz",
           "sha256": "82ab1c13f782cb37176e7c13c5fb2c77536a65f24b85d09127f3575f917fb56d"
         }
       ]
@@ -17,7 +17,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/karchive-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/karchive-6.31.0.tar.xz",
           "sha256": "95acaf5a459593184104e1c157cef415ec59a33e71674186169e0df33cdacaac"
         }
       ]
@@ -27,7 +27,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kconfig-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kconfig-6.31.0.tar.xz",
           "sha256": "5572e3e098f7cf5d06c78cd941924333c0e84646d2a18aa6b4c9a6f7eae8a5c9"
         }
       ]
@@ -37,7 +37,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kcoreaddons-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kcoreaddons-6.31.0.tar.xz",
           "sha256": "d3a843249177a6e51714a7211c73829cb071dbebe4f30404423bbbc57ca5ee95"
         }
       ]
@@ -47,7 +47,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kdbusaddons-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kdbusaddons-6.31.0.tar.xz",
           "sha256": "7110f9f07b6cef50a238b01b23f2adcb23552ea1e91e2a9c84f96c5d94a69036"
         }
       ]
@@ -57,7 +57,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kguiaddons-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kguiaddons-6.31.0.tar.xz",
           "sha256": "d440bbe350282b03c828d5987a6db1f0a4f5d87a528907bf19e1e5bb76d4b219"
         }
       ]
@@ -67,7 +67,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/ki18n-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/ki18n-6.31.0.tar.xz",
           "sha256": "9fa271c7a33b856451de1ed3ff105626c2763fbd3b11d3210b02cb30de43f2ba"
         }
       ]
@@ -77,7 +77,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kirigami-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kirigami-6.31.0.tar.xz",
           "sha256": "811a8a150e636216269c0346e62470997fa282113a39e32b2d332bd5969926f0"
         }
       ]
@@ -87,7 +87,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kitemmodels-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kitemmodels-6.31.0.tar.xz",
           "sha256": "bcd5d95bd300c5b8b6400d087bfbf66efec34d3617aef90878e0c90407f6964c"
         }
       ]
@@ -97,7 +97,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kwidgetsaddons-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kwidgetsaddons-6.31.0.tar.xz",
           "sha256": "94d1a1ba334a383c38b7f4238d93895ddd2b40f3d6511b16937bc951b542b5a5"
         }
       ]
@@ -107,7 +107,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kwindowsystem-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kwindowsystem-6.31.0.tar.xz",
           "sha256": "9968f66ba750432480960e321dd7ec32e2ea19a1596496f39147797684842f57"
         }
       ]
@@ -117,7 +117,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/solid-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/solid-6.31.0.tar.xz",
           "sha256": "82950a3d19a8b3ccac11bbcc297e132b975921e25b386f462abe5727a78f1e35"
         }
       ]
@@ -127,7 +127,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/sonnet-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/sonnet-6.31.0.tar.xz",
           "sha256": "8a0db04df7c8d9d386dddc2e5d94f1504b15c63b3dc091a4eeb2519788b5aec6"
         }
       ]
@@ -137,7 +137,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kcolorscheme-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kcolorscheme-6.31.0.tar.xz",
           "sha256": "41a8b12a4d9f4fdada70e4853879a2f43a7bf43e870a18c6038eebd956a1f863"
         }
       ]
@@ -147,7 +147,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kcrash-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kcrash-6.31.0.tar.xz",
           "sha256": "8883c740d5de9aea232060f10c7f3bfdc3f83914b2d91d757ce2c8ed535621a6"
         }
       ]
@@ -157,7 +157,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kpty-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kpty-6.31.0.tar.xz",
           "sha256": "432b0a8fed2d355e19131e3f63c7856e5cb26fe4932ecb840be9465fa072bcea"
         }
       ]
@@ -167,7 +167,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kiconthemes-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kiconthemes-6.31.0.tar.xz",
           "sha256": "d6558d7dc6ed6de90ef3b5eef905c25fb624147a01d2703329144534a5df58ec"
         }
       ]
@@ -177,7 +177,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kio-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kio-6.31.0.tar.xz",
           "sha256": "cdc8e3787be1f4a5c8f8a45fabab5cf540ef6380c549c6fd984f15f093b5eac0"
         }
       ]
@@ -187,7 +187,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/knotifications-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/knotifications-6.31.0.tar.xz",
           "sha256": "34a9a071585bc3e0993ab19c9a9c7dd4813f5a6104b7b0a470e007f258beaf76"
         }
       ]
@@ -197,7 +197,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/kservice-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/kservice-6.31.0.tar.xz",
           "sha256": "a3e6964ca12aae984f3600fb439c1a906ffe8fecc2111fbfa3fb00052d566e23"
         }
       ]
@@ -207,7 +207,7 @@
       "version": "6.31.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/frameworks/6.31/qqc2-desktop-style-6.31.0.tar.xz",
+          "url": "https://download.kde.org/stable/frameworks/6.31/qqc2-desktop-style-6.31.0.tar.xz",
           "sha256": "e01350ca31cf1250b9de0801ecba31a0406cab24c81a3e70dfc90c24acf8d717"
         }
       ]
@@ -217,7 +217,7 @@
       "version": "1.1.1",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/kirigami-app-components/kirigami-app-components-1.1.1.tar.xz",
+          "url": "https://download.kde.org/stable/kirigami-app-components/kirigami-app-components-1.1.1.tar.xz",
           "sha256": "f68f4d082933213d82b805217f2fa0690f51df7d00214ddb873812a60a6b830b"
         }
       ]
@@ -227,7 +227,7 @@
       "version": "1.15.0",
       "sources": [
         {
-          "url": "https://cdn.kde.org/stable/kirigami-addons/kirigami-addons-1.15.0.tar.xz",
+          "url": "https://download.kde.org/stable/kirigami-addons/kirigami-addons-1.15.0.tar.xz",
           "sha256": "82436c7589cdab2e2ee6b2e7d5ab3bedfa049fa7ded5498c01a90a04b9cdbbb3"
         }
       ]

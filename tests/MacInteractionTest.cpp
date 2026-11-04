@@ -9,6 +9,7 @@
 #include "settings/TerminalPaletteModel.h"
 #include "settings/TerminalPresets.h"
 #include "settings/TerminalSettings.h"
+#include "ui/AppAboutData.h"
 #include "ui/AppShortcuts.h"
 #include <ActionCollection/ActionCollection>
 #include <ActionCollection/ActionCollections>
@@ -1357,8 +1358,9 @@ int main(int argc, char **argv)
     BreezeIcons::initIcons();
     QQuickWindow::setDefaultAlphaBuffer(true);
     QApplication app{argc, argv};
-    QCoreApplication::setApplicationName(QStringLiteral("kwi-macos-interaction-test"));
     KLocalizedString::setApplicationDomain("kwi");
+    KAboutData::setApplicationData(Kwi::applicationAboutData());
+    QCoreApplication::setApplicationName(QStringLiteral("kwi-macos-interaction-test"));
     if (helper) {
         KirigamiAppDefaults::apply(qApp);
         Kwi::AppShortcuts shortcuts;

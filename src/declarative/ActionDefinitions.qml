@@ -67,7 +67,7 @@ QtObject {
         AC.StandardActionData { standardAction: AC.StandardActionData.ZoomIn }
         AC.StandardActionData { standardAction: AC.StandardActionData.ZoomOut }
         AC.ActionData { name: "reset_zoom"; text: KI18n.i18nc("@action", "Reset Zoom"); icon.name: "zoom-original"; defaultShortcut: "Ctrl+0" }
-        AC.ActionData { name: "settings"; text: KI18n.i18nc("@action", "Configure Kwi…"); icon.name: "settings-configure"; defaultShortcut: definitions.macOS ? "Ctrl+," : "Ctrl+Shift+," }
+        AC.ActionData { name: "settings"; text: KI18n.i18nc("@action", "Configure %1…", Qt.application.displayName); icon.name: "settings-configure"; defaultShortcut: definitions.macOS ? "Ctrl+," : "Ctrl+Shift+," }
         AC.StandardActionData { standardAction: AC.StandardActionData.ConfigureNotifications }
         AC.ActionData { name: "menu"; text: KI18n.i18nc("@action", "Application Menu"); icon.name: "application-menu"; defaultShortcut: "Shift+F10" }
         AC.ActionData { name: "quit"; text: KI18n.i18nc("@action", "Quit"); icon.name: "window-close"; defaultShortcut: definitions.macOS ? "Ctrl+Q" : "Ctrl+Shift+Q" }

@@ -34,6 +34,10 @@ a new build.
 
 ## Releases
 
+Kwi Mac versions and release dates are independent of KDE Kwi. Use minor releases
+for features and patch releases for fixes. Each release should identify its KDE
+upstream commit and include the pinned dependency provenance with its sources.
+
 Use a clean, committed checkout of a version tag matching `CMakeLists.txt`:
 
 ```sh
@@ -60,6 +64,7 @@ pointer coordinates share visual cell maps. Make records the Ghostty patch hash
 and rebuilds the dependency when it changes.
 
 `make upstream` and the [weekly workflow](.github/workflows/upstream.yml) report KDE
-changes; review updates on an integration branch. Update Ghostty, Qt and ICU
-separately. Check control preservation, reflow, selection and ASCII/RTL performance
-after relevant changes.
+changes; review updates on an integration branch. Prefer tagged KDE releases as
+routine baselines when available, with relevant fixes between releases. Update
+Ghostty, Qt and ICU separately. Check control preservation, reflow, selection and
+ASCII/RTL performance after relevant changes.

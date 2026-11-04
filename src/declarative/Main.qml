@@ -1171,7 +1171,7 @@ Kirigami.ApplicationWindow {
                             }
 
                             Controls.MenuItem {
-                                text: KI18n.i18nc("@action", "About Kwi")
+                                text: KI18n.i18nc("@action", "About %1", Qt.application.displayName)
                                 icon.name: "help-about"
 
                                 onTriggered: aboutDialog.open()
@@ -1359,7 +1359,7 @@ Kirigami.ApplicationWindow {
         maximumWidth: Math.min(preferredWidth, absoluteMaximumWidth)
         closePolicy: Controls.Popup.CloseOnEscape
         dialogType: Kirigami.PromptDialog.Warning
-        title: scope === SessionModel.Application ? KI18n.i18nc("@title:window", "Quit Kwi?") : scope === SessionModel.Window ? KI18n.i18nc("@title:window", "Close All Terminals?") : KI18n.i18nc("@title:window", "Close Terminal?")
+        title: scope === SessionModel.Application ? KI18n.i18nc("@title:window", "Quit %1?", Qt.application.displayName) : scope === SessionModel.Window ? KI18n.i18nc("@title:window", "Close All Terminals?") : KI18n.i18nc("@title:window", "Close Terminal?")
         footer: PromptDialogFooter {
             id: closeDialogFooter
 
@@ -1367,7 +1367,7 @@ Kirigami.ApplicationWindow {
             onRejected: closeDialog.reject()
 
             action: Kirigami.Action {
-                text: closeDialog.scope === SessionModel.Application ? KI18n.i18nc("@action:button", "Quit Kwi") : closeDialog.scope === SessionModel.Window ? KI18n.i18nc("@action:button", "Close All Terminals") : KI18n.i18nc("@action:button", "Close Terminal")
+                text: closeDialog.scope === SessionModel.Application ? KI18n.i18nc("@action:button", "Quit %1", Qt.application.displayName) : closeDialog.scope === SessionModel.Window ? KI18n.i18nc("@action:button", "Close All Terminals") : KI18n.i18nc("@action:button", "Close Terminal")
                 icon.name: "window-close"
 
                 onTriggered: closeDialog.accept()
@@ -1788,7 +1788,7 @@ Kirigami.ApplicationWindow {
         id: aboutDialog
 
         objectName: "aboutDialog"
-        title: KI18n.i18nc("@title:window", "About Kwi")
+        title: KI18n.i18nc("@title:window", "About %1", Qt.application.displayName)
         pageFactory: () => Qt.platform.os === "osx"
             ? Qt.createComponent("org.kde.kwi", "KwiAboutPage")
             : Qt.createComponent("org.kde.kirigamiaddons.formcard", "AboutPage")

@@ -30,7 +30,7 @@ CTEST = "$(PREFIX)/dev-utils/bin/ctest" --test-dir "$(TEST_BUILD)" --output-on-f
 
 .PHONY: all help doctor prepare dependencies configure build check lint test-tools test-native test test-gui \
         sources record-dependencies bundle run package release-assets verify-release validate-release release ci \
-        workloads smoke startup benchmark memory compatibility performance presentation screenshot ci-changes upstream clean
+        workloads smoke startup benchmark memory compatibility performance presentation screenshot ci-changes upstream clean update-cask install-release sync-cask
 
 all: build
 
@@ -104,15 +104,32 @@ release: validate-release verify-release ## Create or refresh a draft from exist
 
 ci: check release-assets ## Run the complete CI build, tests and packaging pipeline
 
-ci-changes: ## Classify CI changes; documentation skips the native build
+update-cask: ## Update Homebrew's version and checksum after publishing TAG
+	"$(PYTHON)" scripts/macos/update-cask.py --tag "$(TAG)" $(ARGS)
+
+sync-cask: ## Open a GitHub-signed cask update PR for the latest stable release
+	"$(PYTHON)" scripts/macos/update-cask.py --pull-request
+
+install-release: ## Install or update the latest published app, without building
+	bash install.sh $(ARGS)
+
+ci-changes: ## Classify CI changes; docs and distribution skip the native build
 	@set -euo pipefail; \
 	build=true; base="$${CI_BASE:-}"; head="$${CI_HEAD:-HEAD}"; \
+	if [ "$${CI_EVENT:-}" = cask ]; then \
+	  [[ "$${GITHUB_REF_NAME:-}" =~ ^automation/homebrew-v[0-9]+\.[0-9]+\.[0-9]+$$ ]] || { echo 'Cask checks require an automation branch' >&2; exit 1; }; \
+	  git merge-base --is-ancestor HEAD^ origin/main || { echo 'Cask parent must already be on main' >&2; exit 1; }; \
+	  [ "$$(git diff --name-only --no-renames HEAD^ HEAD --)" = Casks/kwi-mac.rb ] || { echo 'Cask checks require exactly one cask file change' >&2; exit 1; }; \
+	fi; \
 	if [ "$${CI_EVENT:-}" != workflow_dispatch ] && [ "$${CI_IS_TAG:-false}" != true ] \
 	   && [ -n "$$base" ] && [ "$$base" != 0000000000000000000000000000000000000000 ]; then \
 	  changed=$$(git diff --name-only --no-renames "$$base" "$$head" --); \
 	  build=false; \
 	  while IFS= read -r path; do \
-	    case "$$path" in ''|*.md|*.md.license|docs/*|assets/readme/*) ;; *) build=true; break ;; esac; \
+	    case "$$path" in \
+	      ''|*.md|*.md.license|docs/*|assets/readme/*|install.sh|Casks/*|scripts/macos/update-cask.py|tests/macos/test_installer.py|tests/macos/test_cask.py) ;; \
+	      *) build=true; break ;; \
+	    esac; \
 	  done <<< "$$changed"; \
 	fi; \
 	printf 'build=%s\n' "$$build"; \

@@ -30,7 +30,14 @@ a new build.
 | `make test-gui` | Isolated Mac GUI tests; keep their windows focused |
 | `make package` | Verified app archive and matching sources |
 | `make ci` | Tooling checks, build, tests and release packaging |
+| `make install-release` | Install or update the published app without building |
+| `make update-cask TAG=vX.Y.Z` | Refresh Homebrew's version and checksum after publishing |
+| `make sync-cask` | Open a signed cask update PR for the latest published release |
 | `make help` | All targets, including screenshots and performance checks |
+
+To test installation in a separate directory, use
+`make install-release ARGS='--app-dir /path/to/Applications'`.
+Install, update and rollback tests run in `make check`.
 
 ## Releases
 
@@ -48,8 +55,18 @@ make release TAG=vX.Y.Z
 Replace `vX.Y.Z` with that tag. Draft releases require authenticated GitHub CLI
 (`gh`) and a tag pushed to GitHub. Assets include checksums, licenses and matching sources.
 
-CI runs `make check` for docs-only changes and `make ci` for code changes,
-version tags and manual runs.
+CI runs `make check` for docs and distribution changes. Application/build changes,
+version tags and manual runs use `make ci`.
+
+Publishing a stable release automatically opens a GitHub-signed bot PR updating
+`Casks/kwi-mac.rb` and runs its tooling checks. Review and merge that PR to update
+Homebrew. This repository doubles as the tap. Use the CI workflow's **Sync Homebrew**
+option to retry, or `make sync-cask` from a clean, current checkout of `main`.
+Actions must be allowed to create pull requests in repository settings. GitHub
+combines that permission with review approvals; this workflow never approves PRs.
+
+Use your verified Git identity for personal commits. The app's public contact is
+`kwi@elashri.com`; automated cask commits use GitHub's verified bot identity.
 
 ## Maintenance
 

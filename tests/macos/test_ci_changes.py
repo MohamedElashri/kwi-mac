@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Kwi contributors
 # SPDX-License-Identifier: CC0-1.0
-"""Docs-only CI skips native builds without hiding source changes or bad diffs."""
+"""Docs/distribution CI skips native builds without hiding source changes or bad diffs."""
 import os
 from pathlib import Path
 import shutil
@@ -62,6 +62,39 @@ class CiChangesTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.strip(), "build=true")
                 self.base = self.git("rev-parse", "HEAD")
+
+    def test_distribution_only_changes_use_tooling_checks(self):
+        for filename in ("install.sh", "Casks/kwi-mac.rb", "scripts/macos/update-cask.py", "tests/macos/test_installer.py", "tests/macos/test_cask.py"):
+            self.write(filename, "Distribution change\n")
+        self.commit()
+        result = self.classify()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "build=false")
+
+    def test_automation_parent_diff_uses_tooling_checks(self):
+        self.git("update-ref", "refs/remotes/origin/main", self.base)
+        self.write("Casks/kwi-mac.rb", "Cask update\n")
+        self.commit()
+        result = self.classify(CI_BASE="HEAD^", CI_EVENT="cask", GITHUB_REF_NAME="automation/homebrew-v0.3.0")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "build=false")
+
+    def test_cask_checks_cannot_hide_unmerged_application_changes(self):
+        self.git("update-ref", "refs/remotes/origin/main", self.base)
+        self.write("src/main.cpp", "Unmerged application change\n")
+        self.commit()
+        self.write("Casks/kwi-mac.rb", "Cask update\n")
+        self.commit()
+        result = self.classify(CI_BASE="HEAD^", CI_EVENT="cask", GITHUB_REF_NAME="automation/homebrew-v0.3.0")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("build=false", result.stdout)
+
+    def test_cask_checks_reject_other_file_changes(self):
+        self.git("update-ref", "refs/remotes/origin/main", self.base)
+        self.write("README.md", "Documentation change\n")
+        self.commit()
+        result = self.classify(CI_BASE="HEAD^", CI_EVENT="cask", GITHUB_REF_NAME="automation/homebrew-v0.3.0")
+        self.assertNotEqual(result.returncode, 0)
 
     def test_removing_source_by_renaming_into_docs_still_builds(self):
         (self.root / "docs").mkdir()

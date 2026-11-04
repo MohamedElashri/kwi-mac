@@ -7,18 +7,29 @@ on:
     branches: [main]
     tags: ['v[0-9]*']
   pull_request:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
         description: Existing version tag for a draft release (empty builds main)
         type: string
         required: false
+      sync_cask:
+        description: Sync Homebrew with the published release (skip app build)
+        type: boolean
+        default: false
+      cask_check:
+        description: Check a cask automation commit against its parent
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   checks:
+    if: github.event_name != 'release' && !inputs.sync_cask
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -36,9 +47,9 @@ jobs:
       - name: Classify changed files
         id: changes
         env:
-          CI_EVENT: ${{ github.event_name }}
+          CI_EVENT: ${{ inputs.cask_check && 'cask' || github.event_name }}
           CI_IS_TAG: ${{ github.ref_type == 'tag' || inputs.tag != '' }}
-          CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CI_BASE: ${{ inputs.cask_check && 'HEAD^' || github.event.pull_request.base.sha || github.event.before }}
           CI_HEAD: ${{ github.sha }}
         run: make ci-changes
       - name: Check tools and source formatting
@@ -118,3 +129,30 @@ jobs:
           path: build-macos/release-assets
       - name: Verify assets and prepare draft
         run: make release
+
+  cask:
+    if: >-
+      github.repository == 'MohamedElashri/kwi-mac' &&
+      ((github.event_name == 'release' && !github.event.release.draft && !github.event.release.prerelease) ||
+       (github.event_name == 'workflow_dispatch' && inputs.sync_cask))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: homebrew-cask-sync
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Update cask and open signed pull request
+        run: make sync-cask

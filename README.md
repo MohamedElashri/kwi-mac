@@ -23,19 +23,38 @@ Arabic, Persian and Hebrew support. Built with Qt Quick, KDE Frameworks and libg
 
 ## Install
 
-Download **Kwi-arm64.zip** from the [latest release](https://github.com/MohamedElashri/kwi-mac/releases/latest),
-extract it, and move **Kwi.app** to Applications. An Apple Silicon Mac is required;
-see the release notes for the minimum macOS version.
+An Apple Silicon Mac is required; see the release notes for the minimum macOS version.
+Install or update the latest stable release:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/MohamedElashri/kwi-mac/main/install.sh | bash
+```
+
+Run the same command again to update. The installer verifies checksums and
+signatures and installs to `/Applications` or `~/Applications` without sudo.
+Quit Kwi and use another terminal when updating. For a custom destination, replace
+`bash` with `bash -s -- --app-dir "$HOME/Applications"`.
+
+**Homebrew** uses this repository as its tap:
+
+```sh
+brew tap MohamedElashri/kwi-mac https://github.com/MohamedElashri/kwi-mac.git
+brew install --cask mohamedelashri/kwi-mac/kwi-mac
+```
+
+Update a Homebrew installation with:
+
+```sh
+brew update
+brew upgrade --cask mohamedelashri/kwi-mac/kwi-mac
+```
+
+For manual installation, download **Kwi-arm64.zip** from the
+[latest release](https://github.com/MohamedElashri/kwi-mac/releases/latest),
+extract it, and move **Kwi.app** to Applications.
 
 Builds are ad-hoc signed and not notarized. If macOS blocks the first launch,
 follow [Apple’s Open Anyway instructions](https://support.apple.com/en-us/102445).
-For a trusted download, you can also remove its quarantine attribute:
-
-```sh
-xattr -dr com.apple.quarantine /Applications/Kwi.app
-```
-
-Adjust the path if you installed the app elsewhere.
 
 ## Use
 

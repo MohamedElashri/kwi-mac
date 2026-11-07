@@ -12,15 +12,19 @@ import time
 
 
 def ensure_kwi_not_running(lock=None):
-    lock = lock if lock is not None else Path(f"/tmp/org.kde.kwi-{os.geteuid()}.socket.lock")
-    if not lock.exists():
-        return
-    owner = int(lock.read_text().splitlines()[0])
-    try:
-        os.kill(owner, 0)
-    except ProcessLookupError:
-        return  # QLockFile handles stale endpoint cleanup.
-    raise RuntimeError("Close the existing Kwi instance before measuring; it was not modified")
+    locks = [lock] if lock is not None else [
+        Path(f"/tmp/{identity}-{os.geteuid()}.socket.lock")
+        for identity in ("com.elashri.zirq", "org.kde.kwi")
+    ]
+    for endpoint in locks:
+        if not endpoint.exists():
+            continue
+        owner = int(endpoint.read_text().splitlines()[0])
+        try:
+            os.kill(owner, 0)
+        except ProcessLookupError:
+            continue  # QLockFile handles stale endpoint cleanup.
+        raise RuntimeError("Close the existing Zirq or Kwi instance before measuring; it was not modified")
 
 
 def executable(app):

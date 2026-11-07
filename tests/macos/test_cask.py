@@ -3,6 +3,7 @@
 """Keep cask version and checksum updates paired and reject ambiguous input."""
 from pathlib import Path
 import base64
+import json
 import subprocess
 import tempfile
 import unittest
@@ -16,19 +17,28 @@ class CaskTest(unittest.TestCase):
         updater = load("update-cask")
         with tempfile.TemporaryDirectory() as directory:
             cask = Path(directory) / "kwi-mac.rb"
-            cask.write_text((ROOT / "Casks/kwi-mac.rb").read_text())
-            updater.update("v0.3.0", "a" * 64 + "  Kwi-arm64.zip\n", cask)
+            cask.write_text((ROOT / "Casks/zirq.rb").read_text())
+            updater.update("v0.3.0", "a" * 64 + "  Zirq-arm64.zip\n", cask)
             self.assertIn('version "0.3.0"', cask.read_text())
+            self.assertIn('/Zirq-arm64.zip"', cask.read_text())
+            self.assertIn('  app "Zirq.app"\n', cask.read_text())
             self.assertIn('sha256 "' + "a" * 64 + '"', cask.read_text())
+
+    def test_legacy_archive_and_homebrew_rename_remain_valid(self):
+        text = load("update-cask").render("v0.2.0", "b" * 64 + "  Kwi-arm64.zip\n", (ROOT / "Casks/zirq.rb").read_text())
+        self.assertIn('/Kwi-arm64.zip"', text)
+        self.assertIn('app "Kwi.app", target: "Zirq.app"', text)
+        self.assertEqual(json.loads((ROOT / "cask_renames.json").read_text()), {"kwi-mac": "zirq"})
 
     def test_invalid_or_ambiguous_release_input_preserves_cask(self):
         updater = load("update-cask")
         with tempfile.TemporaryDirectory() as directory:
             cask = Path(directory) / "kwi-mac.rb"
-            original = (ROOT / "Casks/kwi-mac.rb").read_text()
-            for tag, hashes in [("../main", "a" * 64 + "  Kwi-arm64.zip\n"),
+            original = (ROOT / "Casks/zirq.rb").read_text()
+            for tag, hashes in [("../main", "a" * 64 + "  Zirq-arm64.zip\n"),
                                 ("v0.3.0", "missing manifest entry"),
-                                ("v0.3.0", ("a" * 64 + "  Kwi-arm64.zip\n") * 2)]:
+                                ("v0.3.0", "a" * 64 + "  Kwi-arm64.zip\n" + "b" * 64 + "  Zirq-arm64.zip\n"),
+                                ("v0.3.0", ("a" * 64 + "  Zirq-arm64.zip\n") * 2)]:
                 cask.write_text(original)
                 with self.subTest(tag=tag, hashes=hashes), self.assertRaises(ValueError):
                     updater.update(tag, hashes, cask)
@@ -40,9 +50,9 @@ class CaskAutomationTest(unittest.TestCase):
         directory = tempfile.TemporaryDirectory(prefix="kwi cask automation ")
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
-        self.path = self.root / "Casks/kwi-mac.rb"
+        self.path = self.root / "Casks/zirq.rb"
         self.path.parent.mkdir()
-        self.path.write_text((ROOT / "Casks/kwi-mac.rb").read_text())
+        self.path.write_text((ROOT / "Casks/zirq.rb").read_text())
         self.updater = load("update-cask")
         self.calls = []
         self.release = {"tag_name": "v0.3.0", "draft": False, "prerelease": False}
@@ -62,7 +72,7 @@ class CaskAutomationTest(unittest.TestCase):
         if "/contents/" in endpoint:
             return {"content": base64.b64encode(self.path.read_bytes()).decode()}
         if "/compare/" in endpoint:
-            return {"files": [{"filename": "Casks/kwi-mac.rb"}]}
+            return {"files": [{"filename": "Casks/zirq.rb"}]}
         if "/commits/" in endpoint:
             return {"commit": {"verification": {"verified": self.signed}}}
         if "/pulls?" in endpoint:
@@ -75,7 +85,7 @@ class CaskAutomationTest(unittest.TestCase):
         with mock.patch.object(self.updater, "ROOT", self.root), \
                 mock.patch.object(self.updater, "api", side_effect=self.api), \
                 mock.patch.object(self.updater, "git", side_effect=lambda *a: "" if a[0] == "status" else "b" * 40), \
-                mock.patch.object(self.updater, "fetch_checksums", return_value="a" * 64 + "  Kwi-arm64.zip\n"), \
+                mock.patch.object(self.updater, "fetch_checksums", return_value="a" * 64 + "  Zirq-arm64.zip\n"), \
                 mock.patch.object(self.updater.subprocess, "run", side_effect=check_error) as checks:
             self.updater.sync_pull_request(tag)
         return checks
@@ -85,7 +95,7 @@ class CaskAutomationTest(unittest.TestCase):
         checks.assert_called_once_with(["make", "check"], cwd=self.root, check=True)
         payload = next(data for endpoint, data in self.calls if endpoint == "graphql")["variables"]["input"]
         self.assertEqual(payload["expectedHeadOid"], "b" * 40)
-        self.assertEqual([item["path"] for item in payload["fileChanges"]["additions"]], ["Casks/kwi-mac.rb"])
+        self.assertEqual([item["path"] for item in payload["fileChanges"]["additions"]], ["Casks/zirq.rb"])
         self.assertIn('version "0.3.0"', base64.b64decode(payload["fileChanges"]["additions"][0]["contents"]).decode())
         pr = next(data for endpoint, data in self.calls if endpoint.endswith("/pulls"))
         self.assertTrue(pr["body"].startswith("This PR is "))
@@ -119,7 +129,7 @@ class CaskAutomationTest(unittest.TestCase):
             self.run_sync(tag).assert_not_called()
             self.assertFalse(any(data is not None for _, data in self.calls))
         self.release = {"tag_name": "v0.3.0", "draft": False, "prerelease": False}
-        self.updater.update("v0.3.0", "a" * 64 + "  Kwi-arm64.zip\n", self.path)
+        self.updater.update("v0.3.0", "a" * 64 + "  Zirq-arm64.zip\n", self.path)
         self.calls.clear()
         self.run_sync().assert_not_called()
         self.assertFalse(any(data is not None for _, data in self.calls))

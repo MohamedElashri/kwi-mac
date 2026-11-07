@@ -68,7 +68,7 @@ QMap<QString, std::optional<QString>> TerminalLaunch::resolvedEnvironmentChanges
 {
     QMap<QString, std::optional<QString>> result{{QStringLiteral("TERM"), QStringLiteral("xterm-256color")},
                                                  {QStringLiteral("COLORTERM"), QStringLiteral("truecolor")},
-                                                 {QStringLiteral("TERM_PROGRAM"), QStringLiteral("kwi")},
+                                                 {QStringLiteral("TERM_PROGRAM"), QStringLiteral("zirq")},
                                                  {QStringLiteral("COLUMNS"), std::nullopt},
                                                  {QStringLiteral("LINES"), std::nullopt},
                                                  {QStringLiteral("TERMCAP"), std::nullopt}};

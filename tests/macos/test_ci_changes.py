@@ -64,7 +64,7 @@ class CiChangesTest(unittest.TestCase):
                 self.base = self.git("rev-parse", "HEAD")
 
     def test_distribution_only_changes_use_tooling_checks(self):
-        for filename in ("install.sh", "Casks/kwi-mac.rb", "scripts/macos/update-cask.py", "tests/macos/test_installer.py", "tests/macos/test_cask.py"):
+        for filename in ("install.sh", "Casks/zirq.rb", "scripts/macos/update-cask.py", "tests/macos/test_installer.py", "tests/macos/test_cask.py"):
             self.write(filename, "Distribution change\n")
         self.commit()
         result = self.classify()
@@ -73,7 +73,7 @@ class CiChangesTest(unittest.TestCase):
 
     def test_automation_parent_diff_uses_tooling_checks(self):
         self.git("update-ref", "refs/remotes/origin/main", self.base)
-        self.write("Casks/kwi-mac.rb", "Cask update\n")
+        self.write("Casks/zirq.rb", "Cask update\n")
         self.commit()
         result = self.classify(CI_BASE="HEAD^", CI_EVENT="cask", GITHUB_REF_NAME="automation/homebrew-v0.3.0")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -83,7 +83,7 @@ class CiChangesTest(unittest.TestCase):
         self.git("update-ref", "refs/remotes/origin/main", self.base)
         self.write("src/main.cpp", "Unmerged application change\n")
         self.commit()
-        self.write("Casks/kwi-mac.rb", "Cask update\n")
+        self.write("Casks/zirq.rb", "Cask update\n")
         self.commit()
         result = self.classify(CI_BASE="HEAD^", CI_EVENT="cask", GITHUB_REF_NAME="automation/homebrew-v0.3.0")
         self.assertNotEqual(result.returncode, 0)

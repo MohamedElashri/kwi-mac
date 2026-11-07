@@ -47,7 +47,7 @@ elif name == "ditto":
         for member in archive.infolist():
             (Path(args[3]) / member.filename).chmod((member.external_attr >> 16) & 0o777)
 elif name == "mv":
-    if os.environ.get("KWI_FIXTURE_FAIL_REPLACE") and "/extracted/Kwi.app" in args[0]:
+    if os.environ.get("KWI_FIXTURE_FAIL_REPLACE") and "/extracted/Zirq.app" in args[0]:
         sys.exit(1)
     sys.exit(subprocess.call([os.environ["KWI_FIXTURE_REAL_MV"], *args]))
 '''
@@ -71,41 +71,41 @@ class InstallerTest(unittest.TestCase):
         self.release()
 
     @staticmethod
-    def bundle(app, version="0.1.0", identifier="org.kde.kwi", minimum="14.4"):
-        binary = app / "Contents/MacOS/kwi"
+    def bundle(app, version="0.1.0", identifier="com.elashri.zirq", minimum="14.4", executable="zirq"):
+        binary = app / "Contents/MacOS" / executable
         binary.parent.mkdir(parents=True)
         binary.write_text("previous app" if version == "0.1.0" else "new app")
         binary.chmod(0o755)
         (app / "Contents/Info.plist").write_bytes(plistlib.dumps({
-            "CFBundleIdentifier": identifier, "CFBundleExecutable": "kwi",
+            "CFBundleIdentifier": identifier, "CFBundleExecutable": executable,
             "CFBundleShortVersionString": version, "LSMinimumSystemVersion": minimum}))
         return app
 
-    def release(self, version="0.2.0", **kwargs):
+    def release(self, version="0.2.0", product="Zirq", **kwargs):
         source = self.root / "source"
         if source.exists():
             shutil.rmtree(source)
-        app = self.bundle(source / "Kwi.app", version=version, **kwargs)
+        app = self.bundle(source / f"{product}.app", version=version, **kwargs)
         with zipfile.ZipFile(self.root / "release.zip", "w") as archive:
             for path in app.rglob("*"):
                 archive.write(path, path.relative_to(source))
         digest = hashlib.sha256((self.root / "release.zip").read_bytes()).hexdigest()
-        (self.root / "SHA256SUMS").write_text(f"{digest}  Kwi-arm64.zip\n")
+        (self.root / "SHA256SUMS").write_text(f"{digest}  {product}-arm64.zip\n")
 
     def run_installer(self, **env):
         return subprocess.run(["/bin/bash", str(ROOT / "install.sh"), "--app-dir", str(self.apps)],
                               env={**self.env, **env}, text=True, capture_output=True, timeout=20)
 
     def installed_version(self):
-        return plistlib.loads((self.apps / "Kwi.app/Contents/Info.plist").read_bytes())["CFBundleShortVersionString"]
+        return plistlib.loads((self.apps / "Zirq.app/Contents/Info.plist").read_bytes())["CFBundleShortVersionString"]
 
     def assert_preserved(self, **env):
-        self.bundle(self.apps / "Kwi.app")
+        self.bundle(self.apps / "Zirq.app")
         result = self.run_installer(**env)
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertEqual(self.installed_version(), "0.1.0")
-        self.assertEqual((self.apps / "Kwi.app/Contents/MacOS/kwi").read_text(), "previous app")
-        self.assertEqual(list(self.apps.glob(".kwi*")), [])
+        self.assertEqual((self.apps / "Zirq.app/Contents/MacOS/zirq").read_text(), "previous app")
+        self.assertEqual(list(self.apps.glob(".zirq*")), [])
         return result
 
     def test_fresh_install_then_current_version_is_a_noop(self):
@@ -115,33 +115,76 @@ class InstallerTest(unittest.TestCase):
         result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("already installed", result.stdout)
-        self.assertEqual((self.root / "requests").read_text().count("/Kwi-arm64.zip"), 1)
+        self.assertEqual((self.root / "requests").read_text().count("/Zirq-arm64.zip"), 1)
 
-    def test_upgrade_replaces_only_kwi(self):
-        self.bundle(self.apps / "Kwi.app")
+    def test_upgrade_replaces_only_zirq(self):
+        self.bundle(self.apps / "Zirq.app")
         other = self.apps / "other-file"
         other.write_text("keep")
         result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.installed_version(), "0.2.0")
         self.assertEqual(other.read_text(), "keep")
-        self.assertEqual(list(self.apps.glob(".kwi*")), [])
+        self.assertEqual(list(self.apps.glob(".zirq*")), [])
+
+    def test_legacy_release_installs_under_the_new_app_name(self):
+        self.release(product="Kwi", identifier="org.kde.kwi", executable="kwi")
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.installed_version(), "0.2.0")
+        self.assertTrue((self.apps / "Zirq.app/Contents/MacOS/kwi").is_file())
+        self.assertIn("/Kwi-arm64.zip", (self.root / "requests").read_text())
+
+    def test_legacy_app_is_upgraded_and_renamed(self):
+        self.bundle(self.apps / "Kwi.app", identifier="org.kde.kwi", executable="kwi")
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.apps / "Kwi.app").exists())
+        self.assertEqual(self.installed_version(), "0.2.0")
+
+    def test_current_legacy_app_is_renamed_without_downloading(self):
+        self.bundle(self.apps / "Kwi.app", version="0.2.0", identifier="org.kde.kwi", executable="kwi")
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.apps / "Kwi.app").exists())
+        self.assertTrue((self.apps / "Zirq.app/Contents/MacOS/kwi").is_file())
+        self.assertNotIn("/SHA256SUMS", (self.root / "requests").read_text())
+
+    def test_failed_migration_restores_the_legacy_name_and_contents(self):
+        self.bundle(self.apps / "Kwi.app", identifier="org.kde.kwi", executable="kwi")
+        result = self.run_installer(KWI_FIXTURE_FAIL_REPLACE="1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Previous installation restored", result.stderr)
+        self.assertEqual((self.apps / "Kwi.app/Contents/MacOS/kwi").read_text(), "previous app")
+        self.assertFalse((self.apps / "Zirq.app").exists())
+        self.assertEqual(list(self.apps.glob(".zirq*")), [])
+        self.assertFalse((self.apps / ".kwi-install.lock").exists())
+
+    def test_legacy_installer_lock_is_respected_and_preserved(self):
+        self.apps.mkdir()
+        lock = self.apps / ".kwi-install.lock"
+        lock.mkdir()
+        result = self.run_installer()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(lock.is_dir())
+        self.assertFalse((self.apps / ".zirq-install.lock").exists())
+        self.assertFalse((self.root / "requests").exists())
 
     def test_current_but_damaged_app_is_repaired(self):
-        app = self.bundle(self.apps / "Kwi.app", version="0.2.0")
+        app = self.bundle(self.apps / "Zirq.app", version="0.2.0")
         (app / "bad-signature").write_text("damaged")
         result = self.run_installer()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((app / "bad-signature").exists())
 
     def test_newer_installation_is_not_downgraded(self):
-        self.bundle(self.apps / "Kwi.app", version="0.3.0")
+        self.bundle(self.apps / "Zirq.app", version="0.3.0")
         self.assertEqual(self.run_installer().returncode, 0)
         self.assertEqual(self.installed_version(), "0.3.0")
-        self.assertNotIn("/Kwi-arm64.zip", (self.root / "requests").read_text())
+        self.assertNotIn("/Zirq-arm64.zip", (self.root / "requests").read_text())
 
     def test_bad_checksum_preserves_previous_app(self):
-        (self.root / "SHA256SUMS").write_text("0" * 64 + "  Kwi-arm64.zip\n")
+        (self.root / "SHA256SUMS").write_text("0" * 64 + "  Zirq-arm64.zip\n")
         self.assertIn("checksum verification failed", self.assert_preserved().stderr)
 
     def test_bad_signature_preserves_previous_app(self):
@@ -152,7 +195,7 @@ class InstallerTest(unittest.TestCase):
         self.assertIn("Previous installation restored", result.stderr)
 
     def test_running_app_is_left_alone(self):
-        self.assertIn("Quit Kwi", self.assert_preserved(KWI_FIXTURE_RUNNING="1").stderr)
+        self.assertIn("Quit Zirq", self.assert_preserved(KWI_FIXTURE_RUNNING="1").stderr)
 
     def test_process_query_failure_preserves_the_installed_app(self):
         self.assertIn("Cannot check", self.assert_preserved(KWI_FIXTURE_PROCESS_ERROR="1").stderr)
@@ -176,7 +219,7 @@ class InstallerTest(unittest.TestCase):
         with zipfile.ZipFile(self.root / "release.zip", "a") as archive:
             archive.writestr("../escape", "unwanted file")
         digest = hashlib.sha256((self.root / "release.zip").read_bytes()).hexdigest()
-        (self.root / "SHA256SUMS").write_text(f"{digest}  Kwi-arm64.zip\n")
+        (self.root / "SHA256SUMS").write_text(f"{digest}  Zirq-arm64.zip\n")
         self.assertIn("unexpected paths", self.assert_preserved().stderr)
         self.assertFalse((self.apps / "escape").exists())
 
@@ -185,16 +228,16 @@ class InstallerTest(unittest.TestCase):
         self.assertIn("version does not match", self.assert_preserved().stderr)
 
     def test_unrelated_existing_app_is_not_replaced(self):
-        self.bundle(self.apps / "Kwi.app", identifier="example.unrelated")
+        self.bundle(self.apps / "Zirq.app", identifier="example.unrelated")
         self.assertNotEqual(self.run_installer().returncode, 0)
         self.assertEqual(self.installed_version(), "0.1.0")
 
     def test_symlink_destination_is_not_followed(self):
         outside = self.bundle(self.root / "outside.app")
         self.apps.mkdir()
-        (self.apps / "Kwi.app").symlink_to(outside)
+        (self.apps / "Zirq.app").symlink_to(outside)
         self.assertNotEqual(self.run_installer().returncode, 0)
-        self.assertTrue((self.apps / "Kwi.app").is_symlink())
+        self.assertTrue((self.apps / "Zirq.app").is_symlink())
         self.assertTrue(outside.is_dir())
 
     def test_unsupported_platforms_fail_before_downloading(self):

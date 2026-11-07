@@ -19,8 +19,8 @@ class PackageTest(unittest.TestCase):
     def test_deployed_dependency_cannot_fall_back_to_prefix(self):
         bundle, _ = self.modules()
         with tempfile.TemporaryDirectory() as directory:
-            app = Path(directory) / "Kwi.app"
-            binary = app / "Contents/MacOS/kwi"
+            app = Path(directory) / "Zirq.app"
+            binary = app / "Contents/MacOS/zirq"
             binary.parent.mkdir(parents=True)
             with self.assertRaisesRegex(RuntimeError, "Unresolved deployed"):
                 bundle.resolve_dependency(app, binary, "@rpath/libMissing.dylib", ["@executable_path/../Frameworks"])
@@ -32,14 +32,14 @@ class PackageTest(unittest.TestCase):
     def test_internal_version_alias_resolves_inside_app(self):
         bundle, _ = self.modules()
         with tempfile.TemporaryDirectory() as directory:
-            app = Path(directory) / "Kwi.app"
+            app = Path(directory) / "Zirq.app"
             frameworks = app / "Contents/Frameworks"
             frameworks.mkdir(parents=True)
             (app / "Contents/MacOS").mkdir()
             real = frameworks / "libExample.1.2.dylib"
             real.write_bytes(b"library")
             (frameworks / "libExample.1.dylib").symlink_to(real.name)
-            resolved = bundle.resolve_dependency(app, app / "Contents/MacOS/kwi", "@rpath/libExample.1.dylib", ["@executable_path/../Frameworks"])
+            resolved = bundle.resolve_dependency(app, app / "Contents/MacOS/zirq", "@rpath/libExample.1.dylib", ["@executable_path/../Frameworks"])
             self.assertEqual(resolved, real.resolve())
 
     def test_modified_or_unowned_package_is_preserved(self):
@@ -100,7 +100,7 @@ class PackageTest(unittest.TestCase):
             prefix = root / "craft-root"
             (prefix / "etc").mkdir(parents=True)
             (prefix / "etc/kwi-bootstrap.json").write_text('{}')
-            with mock.patch("sys.argv", ["smoke.py", "--app", str(root / "Kwi.app"), "--output", str(root / "run/result.json"),
+            with mock.patch("sys.argv", ["smoke.py", "--app", str(root / "Zirq.app"), "--output", str(root / "run/result.json"),
                                          "--hide-prefix", str(prefix)]), mock.patch.object(smoke, "ensure_kwi_not_running", side_effect=RuntimeError("live app")), \
                     mock.patch.object(smoke.subprocess, "Popen") as launch:
                 with self.assertRaisesRegex(RuntimeError, "live app"):

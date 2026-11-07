@@ -1,9 +1,9 @@
 {
-    "id": "org.kde.kwi",
+    "id": "com.elashri.zirq",
     "runtime": "org.kde.Platform",
     "runtime-version": "6.11",
     "sdk": "org.kde.Sdk",
-    "command": "kwi",
+    "command": "zirq",
     "finish-args": [
         "--device=all",
         "--share=ipc",

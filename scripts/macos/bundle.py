@@ -186,7 +186,7 @@ def audit(app):
 
 
 def inventory_resources(app):
-    required = ("Contents/MacOS/kwi", "Contents/Resources/kwi.icns", "Contents/Resources/qt.conf",
+    required = ("Contents/MacOS/zirq", "Contents/Resources/zirq.icns", "Contents/Resources/qt.conf",
                 "Contents/Resources/qml/org/kde/desktop/qmldir", "Contents/Resources/qml/org/kde/kwi/terminal/qmldir",
                 "Contents/Resources/knotifications6/kwi.notifyrc", "Contents/PlugIns/platforms/libqcocoa.dylib",
                 "Contents/PlugIns/styles/libqmacstyle.dylib", "Contents/PlugIns/iconengines/libqsvgicon.dylib")
@@ -204,14 +204,14 @@ def inventory_resources(app):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prefix", type=Path, default=ROOT / "build-macos/craft-root")
-    parser.add_argument("--output", type=Path, default=ROOT / "build-macos/stage/Kwi.app")
+    parser.add_argument("--output", type=Path, default=ROOT / "build-macos/stage/Zirq.app")
     parser.add_argument("--reuse-deployment", action="store_true", help="Local iteration only: reuse the previous Qt/QML closure, then replace/re-audit app code")
     args = parser.parse_args()
     prefix = args.prefix.resolve()
     destination = args.output.absolute()
     if destination.is_symlink() or destination.suffix != ".app":
         parser.error("Output must be a non-symlink .app directory")
-    source = prefix / "Applications/KDE/kwi.app"
+    source = prefix / "Applications/KDE/zirq.app"
     if not source.exists():
         parser.error("Install and merge kwi/kwi into the Craft prefix first")
     app = destination.with_name("." + destination.stem + ".staging.app")
@@ -267,7 +267,7 @@ def main():
     (resources / "qt.conf").write_text("[Paths]\nPlugins=PlugIns\nQmlImports=Resources/qml\n")
     info_path = app / "Contents/Info.plist"
     info = plistlib.loads(info_path.read_bytes())
-    info.update(CFBundleDisplayName=info["CFBundleName"], CFBundleIdentifier="org.kde.kwi", LSMinimumSystemVersion="14.4")
+    info.update(CFBundleDisplayName=info["CFBundleName"], CFBundleIdentifier="com.elashri.zirq", LSMinimumSystemVersion="14.4")
     info_path.write_bytes(plistlib.dumps(info))
     resource_inventory = inventory_resources(app)
     binaries = audit(app)

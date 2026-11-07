@@ -14,7 +14,7 @@ add_library(kwi-core STATIC
 )
 kconfig_add_kcfg_files(kwi-core GENERATE_MOC settings/TerminalPreferences.kcfgc)
 install(FILES settings/TerminalPreferences.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
-target_include_directories(kwi-core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
+target_include_directories(kwi-core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}" "${PROJECT_BINARY_DIR}")
 target_link_libraries(kwi-core
     PUBLIC Qt6::Core Qt6::Gui Qt6::QmlIntegration KF6::ConfigCore KF6::ConfigGui
         KF6::I18n kwi-terminal
@@ -84,6 +84,7 @@ target_link_libraries(kwi-ui PUBLIC kwi-core Qt6::Quick
 target_include_directories(kwi-ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" PRIVATE settings ui "${PROJECT_BINARY_DIR}")
 
 qt_add_executable(kwi main.cpp)
+set_target_properties(kwi PROPERTIES OUTPUT_NAME "${KWI_EXECUTABLE}")
 if(APPLE)
     target_sources(kwi PRIVATE LocalActivation.cpp LocalActivation.h)
     target_link_libraries(kwi PRIVATE Qt6::Network KF6::BreezeIcons KF6::IconThemes)
@@ -94,9 +95,9 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_COPYRIGHT "2026 Kwi contributors")
     include(ECMAddAppIcon)
-    configure_file("${PROJECT_SOURCE_DIR}/logo.png" "256-kwi.png" COPYONLY)
-    ecm_add_app_icon(kwi ICONS "${CMAKE_CURRENT_BINARY_DIR}/256-kwi.png")
-    set_target_properties(kwi PROPERTIES MACOSX_BUNDLE_ICON_FILE "kwi.icns")
+    configure_file("${PROJECT_SOURCE_DIR}/logo.png" "1024-zirq.png" COPYONLY)
+    ecm_add_app_icon(kwi OUTFILE_BASENAME zirq ICONS "${CMAKE_CURRENT_BINARY_DIR}/1024-zirq.png")
+    set_target_properties(kwi PROPERTIES MACOSX_BUNDLE_ICON_FILE "zirq.icns")
 endif()
 target_link_libraries(kwi PRIVATE kwi-ui Qt6::Widgets KirigamiApp KF6::CoreAddons
     KF6::DBusAddons KF6::I18nQml KF6::Kirigami KF6::WindowSystem)

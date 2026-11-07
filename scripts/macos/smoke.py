@@ -53,7 +53,7 @@ def main():
     app = args.app.resolve()
     work = args.output.resolve().parent
     work.mkdir(parents=True, exist_ok=True)
-    executable = app / "Contents/MacOS/kwi"
+    executable = app / "Contents/MacOS/zirq"
     log_path = work / "launch.log"
     marker = work / "child-marker.txt"
     forwarded_marker = work / "forwarded-marker.txt"
@@ -135,7 +135,7 @@ def main():
                       "frames": frames[:3], "pid": process.pid,
                       "limits": "Logical terminal marker plus frame-swapped callback, not measured pixel presentation or interactive GUI coverage."}
             # QSGRendererInterface::Metal == 6; a fallback backend is not a pass.
-            result["passed"] = bool(result["child_marker"] == "xterm-256color|truecolor|kwi|unset|/" and frames and graphics
+            result["passed"] = bool(result["child_marker"] == "xterm-256color|truecolor|zirq|unset|/" and frames and graphics
                                     and all(e["api"] == 6 for e in graphics) and submitted and forwarded and forwarded["passed"]
                                     and process.poll() is None)
             args.output.write_text(json.dumps(result, indent=2) + "\n")

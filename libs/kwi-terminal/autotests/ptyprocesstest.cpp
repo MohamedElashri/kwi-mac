@@ -91,13 +91,13 @@ void PtyProcessTest::outputEnvironmentAndExit()
                           80,
                           24));
     // Wait for output before allowing the child to revoke its FreeBSD controlling TTY.
-    QTRY_VERIFY(output.contains("xterm-256color|truecolor|kwi"));
+    QTRY_VERIFY(output.contains("xterm-256color|truecolor|zirq"));
     const pid_t pid = pid_t(process.processId());
     QVERIFY(pid > 0);
     QVERIFY(process.write(QByteArray(1, '\x04')));
     QTRY_COMPARE_WITH_TIMEOUT(exited.size(), 1, 5000);
     QCOMPARE(started.size(), 1);
-    QVERIFY(output.contains("xterm-256color|truecolor|kwi"));
+    QVERIFY(output.contains("xterm-256color|truecolor|zirq"));
     QCOMPARE(exited.at(0).at(0).toInt(), 7);
     QVERIFY(errors.isEmpty());
     QVERIFY(!process.isRunning());
@@ -479,10 +479,10 @@ void PtyProcessTest::launchEnvironmentOverrides()
                                  {QStringLiteral("KWI_PART_TEST=value=with=equals")}),
                       80,
                       24));
-    QTRY_COMPARE(received, QByteArray("value=with=equals|kwi"));
+    QTRY_COMPARE(received, QByteArray("value=with=equals|zirq"));
     QVERIFY(process.write(QByteArray(1, '\x04')));
     QTRY_COMPARE_WITH_TIMEOUT(exited.size(), 1, 5000);
-    QCOMPARE(received, QByteArray("value=with=equals|kwi"));
+    QCOMPARE(received, QByteArray("value=with=equals|zirq"));
     QCOMPARE(qgetenv("KWI_PART_TEST"), previous);
 }
 

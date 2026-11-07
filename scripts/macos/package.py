@@ -20,7 +20,7 @@ import bundle
 
 OWNER = "kwi-macos-package-v1"
 ROOT = Path(__file__).resolve().parents[2]
-ASSET_FILES = ("Kwi-arm64.zip", "Kwi-sources.tar.gz", "SOURCES.json", "package.json", "Kwi.bundle.json", "README.txt", "dependencies.json")
+ASSET_FILES = ("Zirq-arm64.zip", "Zirq-sources.tar.gz", "SOURCES.json", "package.json", "Zirq.bundle.json", "README.txt", "dependencies.json")
 
 
 def digest(path):
@@ -92,7 +92,7 @@ def verify_assets(directory, expected_commit=None):
     record = json.loads((directory / "package.json").read_text())
     sources = json.loads((directory / "SOURCES.json").read_text())
     dependencies = json.loads((directory / "dependencies.json").read_text())
-    manifest = json.loads((directory / "Kwi.bundle.json").read_text())
+    manifest = json.loads((directory / "Zirq.bundle.json").read_text())
     commit = record["source"]["source_commit"]
     if (not re.fullmatch(r"[0-9a-f]{40}", commit) or sources["project_commit"] != commit
             or dependencies["source_commit"] != commit or (expected_commit and expected_commit != commit)):
@@ -100,11 +100,11 @@ def verify_assets(directory, expected_commit=None):
     if (record["owner"] != OWNER or not record["full_deployment"] or manifest["reused_deployment"]
             or not record["strict_signatures_original_and_extracted"] or not record["archive_round_trip_bytes_modes_symlinks"]):
         raise RuntimeError("Release package verification is incomplete")
-    if (record["archive"]["name"] != "Kwi-arm64.zip" or record["archive"]["sha256"] != checksums["Kwi-arm64.zip"]
-            or record["archive"]["bytes"] != (directory / "Kwi-arm64.zip").stat().st_size
-            or record["source_distribution"]["archive"] != "Kwi-sources.tar.gz"
-            or record["source_distribution"]["sha256"] != checksums["Kwi-sources.tar.gz"]
-            or record["bundle_manifest_sha256"] != checksums["Kwi.bundle.json"]):
+    if (record["archive"]["name"] != "Zirq-arm64.zip" or record["archive"]["sha256"] != checksums["Zirq-arm64.zip"]
+            or record["archive"]["bytes"] != (directory / "Zirq-arm64.zip").stat().st_size
+            or record["source_distribution"]["archive"] != "Zirq-sources.tar.gz"
+            or record["source_distribution"]["sha256"] != checksums["Zirq-sources.tar.gz"]
+            or record["bundle_manifest_sha256"] != checksums["Zirq.bundle.json"]):
         raise RuntimeError("Release metadata does not match its archives")
     return commit
 
@@ -154,12 +154,12 @@ def draft_release(tag, directory):
             raise RuntimeError("Refusing to replace a published release")
     elif "release not found" not in state.stderr.lower():
         raise RuntimeError(state.stderr.strip() or "Cannot inspect GitHub release")
-    notes = (f"Kwi Mac — Apple Silicon\n\nSource: {commit}\n\n"
+    notes = (f"Zirq — Apple Silicon\n\nSource: {commit}\n\n"
              "An independently maintained macOS fork of KDE Kwi.\n\n"
-             "Extract Kwi.app from Kwi-arm64.zip and copy it to Applications.\n"
+             "Extract Zirq.app from Zirq-arm64.zip and copy it to Applications.\n"
              "Ad-hoc signed; Developer ID signing and notarization are not configured.\n"
              "Headless CI tests and package audits pass. GUI/Metal checks remain local.\n"
-             "Dependency notices are bundled in the app. Kwi-sources.tar.gz contains matching application, dependency and build recipe sources.\n"
+             "Dependency notices are bundled in the app. Zirq-sources.tar.gz contains matching application, dependency and build recipe sources.\n"
              "SOURCES.json lists versions and hashes. Verify downloads with SHA256SUMS.\n"
              "Review this draft before publication.\n")
     with tempfile.TemporaryDirectory(prefix="kwi-release-notes-") as temporary:
@@ -171,7 +171,7 @@ def draft_release(tag, directory):
             subprocess.run(["gh", "release", "upload", tag, *assets, "--clobber"], check=True, cwd=ROOT)
             subprocess.run(["gh", "release", "edit", tag, *flags], check=True, cwd=ROOT)
         else:
-            subprocess.run(["gh", "release", "create", tag, *assets, "--verify-tag", "--title", f"Kwi Mac {tag}", *flags], check=True, cwd=ROOT)
+            subprocess.run(["gh", "release", "create", tag, *assets, "--verify-tag", "--title", f"Zirq {tag}", *flags], check=True, cwd=ROOT)
 
 
 def build(args):
@@ -182,7 +182,7 @@ def build(args):
         work = Path(temporary)
         staged = work / "package"
         staged.mkdir()
-        app = staged / "Kwi.app"
+        app = staged / "Zirq.app"
         # Final packages always rediscover the complete Qt/QML/plugin closure.
         subprocess.run([sys.executable, str(ROOT / "scripts/macos/bundle.py"), "--prefix", str(args.prefix.resolve()), "--output", str(app)],
                        check=True, env=bundle.tool_environment(), timeout=1200)
@@ -190,35 +190,35 @@ def build(args):
         source_distribution = source_bundle.prepare(args.prefix.resolve(), app, staged)
         bundle.run(["codesign", "--force", "--sign", "-", app])
         bundle.run(["codesign", "--verify", "--deep", "--strict", app])
-        manifest_path = staged / "Kwi.bundle.json"
+        manifest_path = staged / "Zirq.bundle.json"
         manifest = json.loads(manifest_path.read_text())
         manifest["resources"] = bundle.inventory_resources(app)
         manifest["files"] = {p.relative_to(app).as_posix(): digest(p) for p in app.rglob("*") if p.is_file() and not p.is_symlink()}
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
-        archive = staged / "Kwi-arm64.zip"
+        archive = staged / "Zirq-arm64.zip"
         bundle.run(["/usr/bin/ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, archive])
         extracted = work / "Extracted Kwi-é"
         bundle.run(["/usr/bin/ditto", "-x", "-k", archive, extracted])
-        restored = extracted / "Kwi.app"
+        restored = extracted / "Zirq.app"
         bundle.run(["codesign", "--verify", "--deep", "--strict", restored])
         if snapshot(app) != snapshot(restored):
             raise RuntimeError("Archive extraction changed app bytes, permissions or symlinks")
         native = bundle.audit(restored)
         resources = bundle.inventory_resources(restored)
         (staged / "README.txt").write_text(
-            "Kwi Mac — Apple Silicon\n\n"
-            "Open Kwi.app, or copy it to a location on this Mac. Keep the app bundle intact.\n"
+            "Zirq — Apple Silicon\n\n"
+            "Open Zirq.app, or copy it to a location on this Mac. Keep the app bundle intact.\n"
             "The ZIP contains the same verified app. No Craft shell or loader/QML environment overrides are needed.\n"
             "Ad-hoc signed; Developer ID signing and notarization are not configured.\n"
-            "Installed license notices are in Kwi.app/Contents/Resources/licenses.\n"
-            "Kwi-sources.tar.gz includes application, dependency and build recipe sources; SOURCES.json maps versions and archives.\n")
+            "Installed license notices are in Zirq.app/Contents/Resources/licenses.\n"
+            "Zirq-sources.tar.gz includes application, dependency and build recipe sources; SOURCES.json maps versions and archives.\n")
         record = {"owner": OWNER, "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   "scope": "Apple Silicon macOS application package",
                   "full_deployment": True, "strict_signatures_original_and_extracted": True,
                   "archive_round_trip_bytes_modes_symlinks": True, "mach_o_files": len(native),
                   "archive": {"name": archive.name, "sha256": digest(archive), "bytes": archive.stat().st_size},
-                  "executable_sha256": digest(app / "Contents/MacOS/kwi"), "resources": resources,
-                  "bundle_manifest_sha256": digest(staged / "Kwi.bundle.json"),
+                  "executable_sha256": digest(app / "Contents/MacOS/zirq"), "resources": resources,
+                  "bundle_manifest_sha256": digest(staged / "Zirq.bundle.json"),
                   "source": json.loads((app / "Contents/Resources/kwi-bundle.json").read_text()),
                   "source_distribution": source_distribution, "notarized": False,
                   "published_files": snapshot(staged)}

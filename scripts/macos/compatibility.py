@@ -78,7 +78,7 @@ print("KWI_COMPATIBILITY_CAPTURE", flush=True)
                     raise RuntimeError("Literal/empty argument fidelity differs")
                 if data["parent_pid"] != primary.pid:
                     raise RuntimeError("Forwarding reached a different app process")
-                for key, value in {"TERM": "xterm-256color", "COLORTERM": "truecolor", "TERM_PROGRAM": "kwi"}.items():
+                for key, value in {"TERM": "xterm-256color", "COLORTERM": "truecolor", "TERM_PROGRAM": "zirq"}.items():
                     if data["environment"][key] != value:
                         raise RuntimeError("Terminal environment differs: " + key)
                 if not (data["environment"]["LANG"] or "").endswith(".UTF-8"):

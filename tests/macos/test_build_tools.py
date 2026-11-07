@@ -117,7 +117,7 @@ class BuildToolsTest(unittest.TestCase):
             (prefix / "lib").mkdir(parents=True)
             (prefix / "lib/libExample.6.1.dylib").write_bytes(b"library")
             (prefix / "lib/libExample.6.dylib").symlink_to("libExample.6.1.dylib")
-            app = root / "Kwi.app"
+            app = root / "Zirq.app"
             frameworks = app / "Contents/Frameworks"
             frameworks.mkdir(parents=True)
             (frameworks / "libExample.6.1.dylib").write_bytes(b"current image")
@@ -130,7 +130,7 @@ class BuildToolsTest(unittest.TestCase):
         bundle = load("bundle")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            app = root / "Kwi.app"
+            app = root / "Zirq.app"
             marker = app / "Contents/Resources/kwi-bundle.json"
             marker.parent.mkdir(parents=True)
             marker.write_text('{"owner":"kwi-macos-bundle"}')
@@ -145,7 +145,7 @@ class BuildToolsTest(unittest.TestCase):
         bundle = load("bundle")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            app = root / "Kwi.app"
+            app = root / "Zirq.app"
             app.mkdir()
             target = root / "external-data"
             target.write_text("external")
@@ -164,7 +164,7 @@ class BuildToolsTest(unittest.TestCase):
             hidden.mkdir()
             sentinel = hidden / "preserve"
             sentinel.write_text("other data")
-            with mock.patch("sys.argv", ["smoke.py", "--app", str(root / "Kwi.app"), "--output", str(root / "result.json"), "--hide-prefix", str(prefix)]), contextlib.redirect_stderr(io.StringIO()):
+            with mock.patch("sys.argv", ["smoke.py", "--app", str(root / "Zirq.app"), "--output", str(root / "result.json"), "--hide-prefix", str(prefix)]), contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit):
                     smoke.main()
             self.assertEqual(sentinel.read_text(), "other data")

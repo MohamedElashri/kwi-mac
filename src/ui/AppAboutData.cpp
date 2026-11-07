@@ -21,12 +21,12 @@ KAboutData applicationAboutData()
                      i18n("© 2026 Kwi contributors\n© 2026 Mohamed Elashri")};
     about.setOtherText(
         i18n("An independently maintained macOS fork of KDE Kwi.\n"
-             "Releases and support are provided by the Kwi Mac project."));
+             "Releases and support are provided by the Zirq project."));
     about.setHomepage(QStringLiteral("https://github.com/MohamedElashri/kwi-mac"));
     about.setBugAddress(QByteArrayLiteral("https://github.com/MohamedElashri/kwi-mac/issues"));
     about.setOrganizationDomain(QByteArrayLiteral(KWI_ORGANIZATION_DOMAIN));
     about.setDesktopFileName(QStringLiteral(KWI_APP_ID));
-    about.setProgramLogo(QVariant::fromValue(QIcon{QStringLiteral(":/icons/org.kde.kwi.svg")}));
+    about.setProgramLogo(QVariant::fromValue(QIcon{QStringLiteral(":/icons/" KWI_APP_ID ".svg")}));
     about.addAuthor(QStringLiteral("Mohamed Elashri"),
                     i18n("Maintainer; macOS integration and bidirectional text support"),
                     QStringLiteral("kwi@elashri.com"),

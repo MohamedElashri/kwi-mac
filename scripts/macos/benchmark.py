@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Kwi contributors
 # SPDX-License-Identifier: CC0-1.0
-"""Isolated Mac-only Kwi/Ghostty parser calibration; DSR is not presentation."""
+"""Isolated Mac-only Zirq/Ghostty parser calibration; DSR is not presentation."""
 import argparse
 import hashlib
 import json
@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def measure(args, directory, home):
-    if args.terminal == "kwi":
+    if args.terminal == "zirq":
         ensure_kwi_not_running()
     directory.mkdir(parents=True, exist_ok=False)
     isolated_profile(home, args.width, args.height, args.opacity, args.history)
@@ -34,7 +34,7 @@ def measure(args, directory, home):
     if args.seconds:
         child += ["--seconds", str(args.seconds), "--rate", str(args.rate)]
     app_executable = executable(args.app)
-    if args.terminal == "kwi":
+    if args.terminal == "zirq":
         if args.presentation_library:
             env.update(DYLD_INSERT_LIBRARIES=str(args.presentation_library), KWI_PRESENTATION_TRACE=str(directory / "drawables.jsonl"))
         if args.trace:
@@ -64,15 +64,15 @@ def measure(args, directory, home):
                 chain.append({"pid": candidate, "path": str(path)})
                 if path.samefile(app_executable):
                     break
-                if args.terminal == "kwi" or candidate <= 1:
+                if args.terminal == "zirq" or candidate <= 1:
                     raise RuntimeError(f"App identity differs: {chain}")
                 candidate = int(subprocess.check_output(["/bin/ps", "-p", str(candidate), "-o", "ppid="], text=True, timeout=5))
             else:
                 raise RuntimeError(f"App is not in the bounded launch ancestry: {chain}")
-            if args.terminal == "kwi" and candidate != process.pid:
+            if args.terminal == "zirq" and candidate != process.pid:
                 raise RuntimeError("An existing instance received the request")
             app_pid = candidate
-            foreground = activate_owned_app(args.app, app_pid) if args.terminal == "kwi" else None
+            foreground = activate_owned_app(args.app, app_pid) if args.terminal == "zirq" else None
             (directory / "start").touch()
             result = wait_json(directory / "result.json", process, max(100, args.seconds + 20))
             result["spawn_to_child_ready_ms"] = (ready["ready_ns"] - started) / 1e6
@@ -120,7 +120,7 @@ def measure(args, directory, home):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app", type=Path, required=True)
-    parser.add_argument("--terminal", choices=("kwi", "ghostty"), required=True)
+    parser.add_argument("--terminal", choices=("zirq", "ghostty"), required=True)
     parser.add_argument("--workload", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--columns", type=int, default=120)
@@ -135,7 +135,7 @@ def main():
     parser.add_argument("--rate", type=int, default=0)
     parser.add_argument("--probe", action="store_true")
     parser.add_argument("--keep-viewport", action="store_true")
-    parser.add_argument("--presentation-library", type=Path, help="Opt-in test-only Metal presentation instrumentation for Kwi")
+    parser.add_argument("--presentation-library", type=Path, help="Opt-in test-only Metal presentation instrumentation for Zirq")
     parser.add_argument("--alternating-presentation-library", type=Path, help="Alternate control/instrumented pairs for overhead calibration")
     args = parser.parse_args()
     if not 1 <= args.iterations <= 10 or not 0 <= args.seconds <= 60 or not 0 < args.opacity <= 1:
@@ -143,12 +143,12 @@ def main():
     args.app, args.output = args.app.resolve(), args.output.resolve()
     if args.presentation_library:
         args.presentation_library = args.presentation_library.resolve()
-        if args.terminal != "kwi" or not args.presentation_library.is_file():
-            parser.error("Presentation instrumentation requires Kwi and an existing test library")
+        if args.terminal != "zirq" or not args.presentation_library.is_file():
+            parser.error("Presentation instrumentation requires Zirq and an existing test library")
     if args.alternating_presentation_library:
         args.alternating_presentation_library = args.alternating_presentation_library.resolve()
-        if args.terminal != "kwi" or args.presentation_library or not args.alternating_presentation_library.is_file():
-            parser.error("Alternating calibration requires Kwi, an existing library, and no --presentation-library")
+        if args.terminal != "zirq" or args.presentation_library or not args.alternating_presentation_library.is_file():
+            parser.error("Alternating calibration requires Zirq, an existing library, and no --presentation-library")
     if args.workload:
         args.workload = args.workload.resolve()
     # A campaign owns a fresh output/profile directory. Never overwrite a user's

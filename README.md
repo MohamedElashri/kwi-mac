@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 Eike Hein <hein@kde.org>
 SPDX-FileCopyrightText: 2026 Mohamed Elashri <kwi@elashri.com>
 SPDX-License-Identifier: CC0-1.0
 -->
-# <img src="logo.png" width="32" alt=""/> Kwi Mac
+# <img src="logo.svg" width="32" alt=""/> Zirq
 
 [![CI](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml)
 [![Latest release](https://img.shields.io/github/v/release/MohamedElashri/kwi-mac)](https://github.com/MohamedElashri/kwi-mac/releases/latest)
@@ -14,7 +14,7 @@ A Metal-accelerated terminal for Apple Silicon. An independently maintained
 macOS fork of [KDE Kwi](https://invent.kde.org/utilities/kwi), with bidirectional
 Arabic, Persian and Hebrew support. Built with Qt Quick, KDE Frameworks and libghostty-vt.
 
-![Kwi with tabbed sessions, truecolor output and Unicode text](assets/readme/screenshot.png)
+![Zirq with tabbed sessions, truecolor output and Unicode text](assets/readme/screenshot.png)
 
 - **Tabbed sessions** with searchable scrollback and keyboard selection.
 - **Arabic, Persian and Hebrew** with bidirectional rendering, joining and mixed-script copy and search.
@@ -32,29 +32,43 @@ curl -fsSL https://raw.githubusercontent.com/MohamedElashri/kwi-mac/main/install
 
 Run the same command again to update. The installer verifies checksums and
 signatures and installs to `/Applications` or `~/Applications` without sudo.
-Quit Kwi and use another terminal when updating. For a custom destination, replace
+Quit Zirq and use another terminal when updating. For a custom destination, replace
 `bash` with `bash -s -- --app-dir "$HOME/Applications"`.
 
 **Homebrew** uses this repository as its tap:
 
 ```sh
 brew tap MohamedElashri/kwi-mac https://github.com/MohamedElashri/kwi-mac.git
-brew install --cask mohamedelashri/kwi-mac/kwi-mac
+brew install --cask mohamedelashri/kwi-mac/zirq
 ```
 
 Update a Homebrew installation with:
 
 ```sh
 brew update
-brew upgrade --cask mohamedelashri/kwi-mac/kwi-mac
+brew upgrade --cask mohamedelashri/kwi-mac/zirq
 ```
 
-For manual installation, download **Kwi-arm64.zip** from the
-[latest release](https://github.com/MohamedElashri/kwi-mac/releases/latest),
-extract it, and move **Kwi.app** to Applications.
+For manual installation, download the app archive from the
+[latest release](https://github.com/MohamedElashri/kwi-mac/releases/latest)
+and move the included app to Applications. The first Zirq release uses
+**Zirq-arm64.zip**; version 0.2.0 still uses **Kwi-arm64.zip**.
 
 Builds are ad-hoc signed and not notarized. If macOS blocks the first launch,
 follow [Apple’s Open Anyway instructions](https://support.apple.com/en-us/102445).
+
+The first Zirq source version is 0.3.0. Until it is published, the installer and
+Homebrew continue to verify the existing 0.2.0 Kwi archive; Homebrew installs it
+as `Zirq.app`. The next release switches to the new Zirq bundle automatically.
+
+## Upgrading from Kwi Mac
+
+Zirq uses the same preferences, presets, color schemes and shortcut collections,
+so your existing profile carries over. The installer recognizes `Kwi.app` and
+replaces it with `Zirq.app`, with rollback if replacement fails. Homebrew tracks
+the `kwi-mac` → `zirq` cask rename through this tap.
+
+The repository and download URLs remain at `MohamedElashri/kwi-mac`.
 
 ## Use
 
@@ -66,7 +80,7 @@ arrange RTL text themselves, turn it off under **Terminal → Text direction**.
 
 ## Development
 
-Kwi Mac has its own versions, releases and support, maintained by
+Zirq has its own versions, releases and support, maintained by
 [Mohamed Elashri](https://github.com/MohamedElashri). We regularly review KDE Kwi
 updates and integrate them through tested pull requests.
 

@@ -17,7 +17,7 @@ make run JOBS=2
 ```
 
 If `xcode-select` points to Command Line Tools, set `DEVELOPER_DIR` to your full
-Xcode `Contents/Developer` directory. Quit an older Kwi instance before testing
+Xcode `Contents/Developer` directory. Quit an older Zirq or Kwi instance before testing
 a new build.
 
 ## Commands
@@ -41,7 +41,7 @@ Install, update and rollback tests run in `make check`.
 
 ## Releases
 
-Kwi Mac versions and release dates are independent of KDE Kwi. Use minor releases
+Zirq versions and release dates are independent of KDE Kwi. Use minor releases
 for features and patch releases for fixes. Each release should identify its KDE
 upstream commit and include the pinned dependency provenance with its sources.
 
@@ -59,7 +59,7 @@ CI runs `make check` for docs and distribution changes. Application/build change
 version tags and manual runs use `make ci`.
 
 Publishing a stable release automatically opens a GitHub-signed bot PR updating
-`Casks/kwi-mac.rb` and runs its tooling checks. Review and merge that PR to update
+`Casks/zirq.rb` and runs its tooling checks. Review and merge that PR to update
 Homebrew. This repository doubles as the tap. Use the CI workflow's **Sync Homebrew**
 option to retry, or `make sync-cask` from a clean, current checkout of `main`.
 Actions must be allowed to create pull requests in repository settings. GitHub
@@ -89,3 +89,19 @@ changes; review updates on an integration branch. Prefer tagged KDE releases as
 routine baselines when available, with relevant fixes between releases. Update
 Ghostty, Qt and ICU separately. Check control preservation, reflow, selection and
 ASCII/RTL performance after relevant changes.
+
+## Branding and profile compatibility
+
+Zirq uses the `zirq` executable, `Zirq.app` bundle and `com.elashri.zirq` app ID.
+Version 0.3.0 is the first source version with the Zirq identity. The tap keeps
+its verified 0.2.0 archive until a Zirq release is published; the cask updater
+then switches both the archive and bundle names together.
+
+Internal CMake targets, QML modules, translation domains and `KwiLaunchPreset`
+files retain their upstream names. The existing `kwirc`, `kwiterminalrc`, `kwistaterc`,
+shortcut collections and `kwi/` data directories remain the profile locations.
+This preserves user data and keeps upstream synchronization manageable.
+
+`logo.svg` is the vector source for the Zirq mark. Regenerate the 1024-pixel
+`logo.png` with `rsvg-convert -w 1024 -h 1024 -o logo.png logo.svg`; the Mac build
+generates its Retina icon from that image.

@@ -125,7 +125,7 @@ void LaunchSettingsTest::terminalDefaultsKeepTheRequestedRecipe()
     const auto defaults = launch.environment();
     QCOMPARE(defaults.value(QStringLiteral("TERM")), QStringLiteral("xterm-256color"));
     QCOMPARE(defaults.value(QStringLiteral("COLORTERM")), QStringLiteral("truecolor"));
-    QCOMPARE(defaults.value(QStringLiteral("TERM_PROGRAM")), QStringLiteral("kwi"));
+    QCOMPARE(defaults.value(QStringLiteral("TERM_PROGRAM")), QStringLiteral("zirq"));
 
     for (const auto *name : {"COLUMNS", "LINES", "TERMCAP"}) {
         QVERIFY(!defaults.contains(QString::fromLatin1(name)));
@@ -145,7 +145,7 @@ void LaunchSettingsTest::terminalDefaultsKeepTheRequestedRecipe()
     QCOMPARE(environment.value(QStringLiteral("COLUMNS")), QStringLiteral("42"));
     QVERIFY(!environment.contains(QStringLiteral("LINES")));
     QVERIFY(!environment.contains(QStringLiteral("TERMCAP")));
-    QCOMPARE(environment.value(QStringLiteral("TERM_PROGRAM")), QStringLiteral("kwi"));
+    QCOMPARE(environment.value(QStringLiteral("TERM_PROGRAM")), QStringLiteral("zirq"));
     QCOMPARE(environment.value(QStringLiteral("EXPLICIT")), QStringLiteral("literal=$HOME"));
     QCOMPARE(environment.value(QStringLiteral("UNCHANGED")), QStringLiteral("captured"));
 }

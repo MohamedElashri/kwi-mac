@@ -116,7 +116,7 @@ class TerminalActionsClient final : public KXMLGUIClient
 public:
     TerminalActionsClient()
     {
-        setComponentName(QStringLiteral("kwipart"), i18nd("kwi", "Kwi Terminal"));
+        setComponentName(QStringLiteral("kwipart"), i18nd("kwi", "Zirq Terminal"));
 
         // Dolphin builds against our QTabWidget, where a MenuBar would cover the terminal.
         setXML(QStringLiteral("<gui name=\"kwipart\" version=\"1\" translationDomain=\"kwi\"/>"));
@@ -133,7 +133,7 @@ Part::Part(QWidget *, QObject *parent, const KPluginMetaData &metadata, const QV
     , m_tabs{new QTabWidget}
     , m_terminalClient{std::make_unique<TerminalActionsClient>()}
 {
-    setComponentName(QStringLiteral("kwipart"), i18nd("kwi", "Kwi Terminal"));
+    setComponentName(QStringLiteral("kwipart"), i18nd("kwi", "Zirq Terminal"));
     setWidget(m_tabs);
     m_tabs->setObjectName(QStringLiteral("kwiPartTabs"));
     m_tabs->setDocumentMode(true);
@@ -819,7 +819,7 @@ void Part::setupActions()
         m_sessions->closeSession(m_sessions->currentIndex());
     });
 
-    add("options_configure", i18nd("kwi", "Configure Kwi…"), "configure", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Comma), [this] {
+    add("options_configure", i18nd("kwi", "Configure Zirq…"), "configure", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Comma), [this] {
         showSettings();
     });
 

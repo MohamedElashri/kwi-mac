@@ -45,7 +45,7 @@ def main():
         parser.error("Use 6–30 equal batches")
     app, output = args.app.resolve(), args.output.resolve()
     binary = executable(app)
-    endpoint = Path(f"/tmp/org.kde.kwi-{os.geteuid()}.socket")
+    endpoint = Path(f"/tmp/com.elashri.zirq-{os.geteuid()}.socket")
     lock = Path(str(endpoint) + ".lock")
     ensure_kwi_not_running(lock)
     output.mkdir(parents=True, exist_ok=False)

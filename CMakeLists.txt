@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 cmake_minimum_required(VERSION 3.28)
-project(kwi VERSION 0.2.0 LANGUAGES C CXX)
+project(kwi VERSION 0.3.0 LANGUAGES C CXX)
 
 if(APPLE)
     enable_language(OBJCXX)
@@ -14,10 +14,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(QT_MIN_VERSION 6.11)
 set(KF_MIN_VERSION 6.29)
-set(KWI_DISPLAY_NAME "Kwi Mac")
-set(KWI_APP_ID "org.kde.kwi")
-set(KWI_ORGANIZATION_DOMAIN "kde.org")
-set(KWI_EXECUTABLE "kwi")
+set(KWI_DISPLAY_NAME "Zirq")
+set(KWI_APP_ID "com.elashri.zirq")
+set(KWI_ORGANIZATION_DOMAIN "elashri.com")
+set(KWI_EXECUTABLE "zirq")
 set(KWI_PROJECT_LICENSE "GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL")
 
 find_package(ECM ${KF_MIN_VERSION} REQUIRED NO_MODULE)

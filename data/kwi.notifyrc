@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: CC0-1.0
 
 [Global]
-IconName=org.kde.kwi
-DesktopEntry=org.kde.kwi
-Name=Kwi
+IconName=com.elashri.zirq
+DesktopEntry=com.elashri.zirq
+Name=Zirq
 Comment=Terminal notifications
 Comment[de]=Terminalbenachrichtigungen
 Comment[ko]=터미널 알림

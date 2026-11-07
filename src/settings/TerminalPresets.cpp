@@ -357,13 +357,13 @@ bool TerminalPresets::removePreset(const QString &name)
 bool TerminalPresets::importPreset(const QUrl &url)
 {
     if (!url.isLocalFile()) {
-        return setError(i18n("Choose a local Kwi terminal preset."));
+        return setError(i18n("Choose a local Zirq terminal preset."));
     }
 
     const auto imported = readPreset(url.toLocalFile());
 
     if (!imported) {
-        return setError(i18n("This file is not a valid Kwi launch preset."));
+        return setError(i18n("This file is not a valid Zirq launch preset."));
     }
 
     if (preset(imported->name)) {

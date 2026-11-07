@@ -14,18 +14,24 @@ from urllib.parse import quote
 ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY = "https://github.com/MohamedElashri/kwi-mac"
 REPO = "MohamedElashri/kwi-mac"
-CASK = "Casks/kwi-mac.rb"
+CASK = "Casks/zirq.rb"
 
 
 def render(tag, checksums, text):
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag):
         raise ValueError("Use a stable release tag such as vX.Y.Z")
-    matches = re.findall(r"^([0-9a-f]{64})  Kwi-arm64\.zip$", checksums, re.MULTILINE)
+    # Until the first Zirq release is published, the tap still serves the
+    # verified Kwi archive. Switch both artifact and bundle names together.
+    matches = re.findall(r"^([0-9a-f]{64})  (Zirq|Kwi)-arm64\.zip$", checksums, re.MULTILINE)
     if len(matches) != 1:
-        raise ValueError("Expected exactly one Kwi-arm64.zip SHA-256")
+        raise ValueError("Expected exactly one terminal app ZIP SHA-256")
+    checksum, product = matches[0]
+    text, urls = re.subn(r'/[A-Za-z]+-arm64\.zip"', f'/{product}-arm64.zip"', text)
+    app = '  app "Zirq.app"' if product == "Zirq" else '  app "Kwi.app", target: "Zirq.app"'
+    text, apps = re.subn(r'^  app .*$', app, text, flags=re.MULTILINE)
     text, versions = re.subn(r'^  version "[^"]+"$', f'  version "{tag[1:]}"', text, flags=re.MULTILINE)
-    text, hashes = re.subn(r'^  sha256 "[0-9a-f]{64}"$', f'  sha256 "{matches[0]}"', text, flags=re.MULTILINE)
-    if versions != 1 or hashes != 1:
+    text, hashes = re.subn(r'^  sha256 "[0-9a-f]{64}"$', f'  sha256 "{checksum}"', text, flags=re.MULTILINE)
+    if (versions, hashes, urls, apps) != (1, 1, 1, 1):
         raise ValueError("Cask format changed; review it before updating")
     return text
 
@@ -116,7 +122,7 @@ def sync_pull_request(tag=""):
     pulls = api(f"repos/{REPO}/pulls?state=open&base=main&head={quote(REPO.split('/')[0] + ':' + branch, safe='')}")
     pr = pulls[0] if pulls else api(f"repos/{REPO}/pulls", {
         "base": "main", "head": branch, "title": f"Update Homebrew cask to {tag}",
-        "body": f"This PR is updating the Homebrew cask to Kwi Mac {tag[1:]} using the published release checksum.",
+        "body": f"This PR is updating the Homebrew cask to Zirq {tag[1:]} using the published release checksum.",
     })
     # GITHUB_TOKEN-created PRs do not trigger CI, so dispatch their read-only checks explicitly.
     api(f"repos/{REPO}/actions/workflows/checks.yml/dispatches", {
@@ -137,8 +143,8 @@ def main():
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", args.tag):
         parser.error("Set TAG to the published stable release tag")
     checksums = args.checksums.read_text() if args.checksums else fetch_checksums(args.tag)
-    update(args.tag, checksums, ROOT / "Casks/kwi-mac.rb")
-    print(f"Updated Casks/kwi-mac.rb for {args.tag}; review and commit the change.")
+    update(args.tag, checksums, ROOT / "Casks/zirq.rb")
+    print(f"Updated Casks/zirq.rb for {args.tag}; review and commit the change.")
 
 
 if __name__ == "__main__":

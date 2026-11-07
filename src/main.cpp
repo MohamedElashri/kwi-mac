@@ -12,6 +12,7 @@
 #include "ui/AppShortcuts.h"
 
 #include <KAboutData>
+#include <KConfig>
 #ifdef Q_OS_MACOS
 #include "LocalActivation.h"
 #include "MacLaunch_p.h"
@@ -98,6 +99,8 @@ int main(int argc, char **argv)
     if (tracing) {
         Kwi::trace(QStringLiteral("startup"), {{QStringLiteral("main_start_ns"), processStart}, {QStringLiteral("application_start_ns"), applicationStart}});
     }
+    // Keep shortcuts and framework preferences in the established user profile.
+    KConfig::setMainConfigName(QStringLiteral("kwirc"));
     KirigamiAppDefaults::apply(&app);
     Kwi::traceStage(QStringLiteral("kirigami-defaults"));
     QCoreApplication::setApplicationName(QStringLiteral(KWI_EXECUTABLE));

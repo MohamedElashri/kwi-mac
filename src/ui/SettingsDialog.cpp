@@ -32,7 +32,7 @@ SettingsDialog::SettingsDialog(QWidget *parent, TerminalSettings *settings, Term
     , m_presetEditor{new PresetEditor(presets, this)}
 {
     setObjectName(QStringLiteral("kwiTerminalSettingsDialog"));
-    setWindowTitle(i18nc("@title:window", "Configure Kwi Terminal"));
+    setWindowTitle(i18nc("@title:window", "Configure Zirq Terminal"));
     setAttribute(Qt::WA_DeleteOnClose);
     setFaceType(KPageDialog::List);
     setStandardButtons(QDialogButtonBox::NoButton);

@@ -149,15 +149,15 @@ def prepare(prefix, app, output):
         path = output / f".{name}-source.tar.gz"
         subprocess.run(["git", "-C", str(checkout), "archive", "--format=tar.gz", f"--prefix={name}/", "--output", str(path), revision], check=True)
         recipe_archives.append((name, path))
-    manifest = {"project_commit": commit, "project_source": "application/Kwi-source.tar.gz",
+    manifest = {"project_commit": commit, "project_source": "application/Zirq-source.tar.gz",
                 "build_recipes": {"craft": catalog["craft_commit"], "blueprints": catalog["blueprints_commit"]},
-                "components": entries, "source_archive": "Kwi-sources.tar.gz"}
+                "components": entries, "source_archive": "Zirq-sources.tar.gz"}
     manifest_file = output / "SOURCES.json"
     manifest_file.write_text(json.dumps(manifest, indent=2) + "\n")
     shutil.copy2(manifest_file, notices / "SOURCES.json")
-    source_archive = output / "Kwi-sources.tar.gz"
+    source_archive = output / "Zirq-sources.tar.gz"
     with tarfile.open(source_archive, "w:gz", compresslevel=1) as archive:
-        archive.add(project_source, arcname="application/Kwi-source.tar.gz")
+        archive.add(project_source, arcname="application/Zirq-source.tar.gz")
         archive.add(manifest_file, arcname="SOURCES.json")
         for name, path in recipe_archives:
             archive.add(path, arcname=f"build-recipes/{name}-source.tar.gz")

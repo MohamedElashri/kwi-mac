@@ -16,6 +16,7 @@
 
 #include <KLocalizedQmlContext>
 #include <KLocalizedString>
+#include <KSharedConfig>
 #include <KWindowEffects>
 #include <KWindowStateSaver>
 #include <KWindowSystem>
@@ -480,7 +481,8 @@ WindowManager::WindowContext *WindowManager::createWindow()
 void WindowManager::initializeWindow(WindowContext *context)
 {
     if (!m_settings->useCustomWindowSize()) {
-        new KWindowStateSaver{context->window, QStringLiteral("MainWindow")};
+        // Keep the established state file so the Zirq rename preserves window geometry.
+        new KWindowStateSaver{context->window, KConfigGroup{KSharedConfig::openStateConfig(QStringLiteral("kwistaterc")), QStringLiteral("MainWindow")}};
 
         return;
     }

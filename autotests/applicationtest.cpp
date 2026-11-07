@@ -23,6 +23,7 @@
 #include <QPointer>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QSignalSpy>
 #include <QStringList>
 #include <QStringLiteral>
 #include <QTemporaryDir>
@@ -128,8 +129,17 @@ void ApplicationTest::keyboardTabsAndSearch()
     QTRY_COMPARE(sessions->currentSession(), first.data());
     QTest::keyClick(window, Qt::Key_2, tabModifiers);
     QTRY_COMPARE(sessions->currentSession(), second.data());
+    // A model change can precede focus delivery to the newly selected pane.
+    QTRY_VERIFY(([&] {
+        const auto *active = qobject_cast<TerminalView *>(window->activeFocusItem());
+        return active && active->session() == second.data();
+    })());
+    QSignalSpy confirmation{sessions, &SessionModel::closeConfirmationRequested};
     QTest::keyClick(window, Qt::Key_W, applicationModifiers);
-    QTRY_COMPARE(sessions->count(), 1);
+    QTRY_VERIFY2(sessions->count() == 1,
+                 qPrintable(QStringLiteral("Tab did not close; confirmations=%1, busy=%2")
+                                .arg(confirmation.count())
+                                .arg(second && second->isBusy())));
     QTRY_VERIFY(second.isNull());
     QCOMPARE(sessions->currentSession(), first.data());
     QVERIFY(first->historyText().contains(QStringLiteral("\nKEYBOARD_READY\n")));

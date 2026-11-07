@@ -168,7 +168,7 @@ private Q_SLOTS:
     void initTestCase()
     {
         QStandardPaths::setTestModeEnabled(true);
-        QCoreApplication::setApplicationName(QStringLiteral("kwi-macos-lifecycle-test"));
+        QCoreApplication::setApplicationName(QStringLiteral("zirq-macos-lifecycle-test"));
         QApplication::setQuitOnLastWindowClosed(false);
         BreezeIcons::initIcons();
         KirigamiAppDefaults::apply(qApp);
@@ -467,9 +467,9 @@ int main(int argc, char **argv)
     BreezeIcons::initIcons();
     QQuickWindow::setDefaultAlphaBuffer(true);
     QApplication app{argc, argv};
-    const bool tracing{qEnvironmentVariableIntValue("KWI_TRACE") == 1};
-    qunsetenv("KWI_TRACE");
-    app.setProperty("kwiTrace", tracing);
+    const bool tracing{qEnvironmentVariableIntValue("ZIRQ_TRACE") == 1};
+    qunsetenv("ZIRQ_TRACE");
+    app.setProperty("zirqTrace", tracing);
     MacLifecycleTest test;
     return QTest::qExec(&test, argc, argv);
 }

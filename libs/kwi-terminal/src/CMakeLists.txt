@@ -58,3 +58,5 @@ if(APPLE)
     target_sources(kwi-terminal PRIVATE MacInput.mm MacInput_p.h)
     target_link_libraries(kwi-terminal PRIVATE "-framework AppKit")
 endif()
+
+ecm_generate_qdoc(kwi-terminal kwi-terminal.qdocconf)

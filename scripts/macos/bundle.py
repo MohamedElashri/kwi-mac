@@ -13,6 +13,8 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
+OWNER = "zirq-macos-bundle"
+LEGACY_OWNER = "kwi-macos-bundle"
 MAGIC = {b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca"}
 
 
@@ -186,7 +188,14 @@ def audit(app):
 
 
 def inventory_resources(app):
-    required = ("Contents/MacOS/kwi", "Contents/Resources/kwi.icns", "Contents/Resources/qt.conf",
+    info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+    version = re.search(r"project\(zirq VERSION ([\d.]+)", (ROOT / "CMakeLists.txt").read_text())[1]
+    expected = {"CFBundleName": "Zirq", "CFBundleDisplayName": "Zirq", "CFBundleIdentifier": "com.elashri.zirq",
+                "CFBundleExecutable": "zirq", "CFBundleIconFile": "zirq.icns",
+                "CFBundleShortVersionString": version, "CFBundleVersion": version}
+    if any(info.get(key) != value for key, value in expected.items()):
+        raise RuntimeError("Bundle identity does not match this Zirq release")
+    required = ("Contents/MacOS/zirq", "Contents/Resources/zirq.icns", "Contents/Resources/qt.conf",
                 "Contents/Resources/qml/org/kde/desktop/qmldir", "Contents/Resources/qml/org/kde/kwi/terminal/qmldir",
                 "Contents/Resources/knotifications6/kwi.notifyrc", "Contents/PlugIns/platforms/libqcocoa.dylib",
                 "Contents/PlugIns/styles/libqmacstyle.dylib", "Contents/PlugIns/iconengines/libqsvgicon.dylib")
@@ -201,23 +210,31 @@ def inventory_resources(app):
                                                     for p in sorted((app / "Contents/Resources/licenses").rglob("*")) if p.is_file()}}
 
 
+def owned_bundle(app):
+    for name in ("zirq-bundle.json", "kwi-bundle.json"):
+        marker = app / "Contents/Resources" / name
+        if marker.exists() or marker.is_symlink():
+            return (not marker.is_symlink() and marker.is_file()
+                    and json.loads(marker.read_text()).get("owner") in (OWNER, LEGACY_OWNER))
+    return False
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prefix", type=Path, default=ROOT / "build-macos/craft-root")
-    parser.add_argument("--output", type=Path, default=ROOT / "build-macos/stage/Kwi.app")
+    parser.add_argument("--output", type=Path, default=ROOT / "build-macos/stage/Zirq.app")
     parser.add_argument("--reuse-deployment", action="store_true", help="Local iteration only: reuse the previous Qt/QML closure, then replace/re-audit app code")
     args = parser.parse_args()
     prefix = args.prefix.resolve()
     destination = args.output.absolute()
     if destination.is_symlink() or destination.suffix != ".app":
         parser.error("Output must be a non-symlink .app directory")
-    source = prefix / "Applications/KDE/kwi.app"
+    source = prefix / "Applications/KDE/zirq.app"
     if not source.exists():
         parser.error("Install and merge kwi/kwi into the Craft prefix first")
     app = destination.with_name("." + destination.stem + ".staging.app")
     for path in (destination, app):
-        marker = path / "Contents/Resources/kwi-bundle.json"
-        if path.exists() and (path.is_symlink() or not marker.exists() or json.loads(marker.read_text()).get("owner") != "kwi-macos-bundle"):
+        if (path.exists() or path.is_symlink()) and (path.is_symlink() or not owned_bundle(path)):
             parser.error("Refusing to replace an app not owned by this bundler")
     if app.exists():
         shutil.rmtree(app)
@@ -230,9 +247,12 @@ def main():
     shutil.copytree(source, app, symlinks=True, dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.dSYM"))
     resources = app / "Contents/Resources"
     resources.mkdir(exist_ok=True)
-    marker = resources / "kwi-bundle.json"
-    inputs = [ROOT / "CMakeLists.txt", *ROOT.glob("src/**/*"), *ROOT.glob("libs/**/*")]
-    marker.write_text(json.dumps({"owner": "kwi-macos-bundle", "source_commit": run(["git", "-C", ROOT, "rev-parse", "HEAD"]).strip(),
+    marker = resources / "zirq-bundle.json"
+    (resources / "kwi-bundle.json").unlink(missing_ok=True)
+    (resources / "kwi.icns").unlink(missing_ok=True)
+    inputs = [ROOT / "CMakeLists.txt", ROOT / "logo.svg", ROOT / "logo.png",
+              *ROOT.glob("data/**/*"), *ROOT.glob("src/**/*"), *ROOT.glob("libs/**/*")]
+    marker.write_text(json.dumps({"owner": OWNER, "source_commit": run(["git", "-C", ROOT, "rev-parse", "HEAD"]).strip(),
                                  "source_inputs": {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                                                    for p in inputs if p.is_file()}}, indent=2) + "\n")
     copy_tree(prefix / "qml/org/kde/kwi/terminal", resources / "qml/org/kde/kwi/terminal")
@@ -267,7 +287,7 @@ def main():
     (resources / "qt.conf").write_text("[Paths]\nPlugins=PlugIns\nQmlImports=Resources/qml\n")
     info_path = app / "Contents/Info.plist"
     info = plistlib.loads(info_path.read_bytes())
-    info.update(CFBundleDisplayName=info["CFBundleName"], CFBundleIdentifier="org.kde.kwi", LSMinimumSystemVersion="14.4")
+    info.update(CFBundleDisplayName=info["CFBundleName"], CFBundleIdentifier="com.elashri.zirq", LSMinimumSystemVersion="14.4")
     info_path.write_bytes(plistlib.dumps(info))
     resource_inventory = inventory_resources(app)
     binaries = audit(app)

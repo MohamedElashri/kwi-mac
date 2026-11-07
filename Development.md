@@ -11,13 +11,13 @@ Use the root [Makefile](Makefile) for local work and CI.
 ## Build and run
 
 ```sh
-git clone https://github.com/MohamedElashri/kwi-mac.git
-cd kwi-mac
+git clone https://github.com/MohamedElashri/zirq.git
+cd zirq
 make run JOBS=2
 ```
 
 If `xcode-select` points to Command Line Tools, set `DEVELOPER_DIR` to your full
-Xcode `Contents/Developer` directory. Quit an older Kwi instance before testing
+Xcode `Contents/Developer` directory. Quit an older Zirq or Kwi instance before testing
 a new build.
 
 ## Commands
@@ -37,11 +37,22 @@ a new build.
 
 To test installation in a separate directory, use
 `make install-release ARGS='--app-dir /path/to/Applications'`.
-Install, update and rollback tests run in `make check`.
+Install, update and rollback tests run in `make check`. After producing release
+assets, test the actual published Kwi 0.2.0 archive against the new ZIP:
+
+```sh
+gh release download v0.2.0 --pattern Kwi-arm64.zip --pattern SHA256SUMS --dir build-macos/upgrade-v0.2.0
+python3 scripts/macos/upgrade.py --previous build-macos/upgrade-v0.2.0 --assets build-macos/release-assets --probe build-macos/craft-root/build/kwi/kwi/work/build/bin/test-macos-compatibility.app/Contents/MacOS/test-macos-compatibility --tag v0.3.0 --output build-macos/results/upgrade-v0.3.0
+```
+
+The output directory must be new. This launches both genuine bundles with an
+isolated home, substitutes only the installer's download transport, and verifies
+profile preservation, presets, fonts, palettes, shortcuts, bidi preference and
+window state. It never installs into the user's Applications directory.
 
 ## Releases
 
-Kwi Mac versions and release dates are independent of KDE Kwi. Use minor releases
+Zirq versions and release dates are independent of KDE Kwi. Use minor releases
 for features and patch releases for fixes. Each release should identify its KDE
 upstream commit and include the pinned dependency provenance with its sources.
 
@@ -59,14 +70,15 @@ CI runs `make check` for docs and distribution changes. Application/build change
 version tags and manual runs use `make ci`.
 
 Publishing a stable release automatically opens a GitHub-signed bot PR updating
-`Casks/kwi-mac.rb` and runs its tooling checks. Review and merge that PR to update
+`Casks/zirq.rb` and runs its tooling checks. Review and merge that PR to update
 Homebrew. This repository doubles as the tap. Use the CI workflow's **Sync Homebrew**
 option to retry, or `make sync-cask` from a clean, current checkout of `main`.
 Actions must be allowed to create pull requests in repository settings. GitHub
 combines that permission with review approvals; this workflow never approves PRs.
 
-Use your verified Git identity for personal commits. The app's public contact is
-`kwi@elashri.com`; automated cask commits use GitHub's verified bot identity.
+Use your verified Git identity for personal commits. Support and bug reports go
+through the [Zirq issue tracker](https://github.com/MohamedElashri/zirq/issues).
+Automated cask commits use GitHub's verified bot identity.
 
 ## Maintenance
 
@@ -78,10 +90,35 @@ Mac integration and RTL features are maintained in this fork:
 
 Keep the VT grid, PTY input, copying and search in logical order. Rendering and
 pointer coordinates share visual cell maps. Make records the Ghostty patch hash
-and rebuilds the dependency when it changes.
+and source manifest and rebuilds the dependency when either changes.
+
+The Mac build pins the standalone libghostty-vt 1.0.0 release and its offline
+dependency archive in `craft/ghostty-sources.json`. Keep the Craft recipe and
+`craft/release-sources.json` in sync when updating it.
 
 `make upstream` and the [weekly workflow](.github/workflows/upstream.yml) report KDE
 changes; review updates on an integration branch. Prefer tagged KDE releases as
 routine baselines when available, with relevant fixes between releases. Update
 Ghostty, Qt and ICU separately. Check control preservation, reflow, selection and
 ASCII/RTL performance after relevant changes.
+
+## Branding and profile compatibility
+
+Zirq uses the `zirq` executable, `Zirq.app` bundle and `com.elashri.zirq` app ID.
+Version 0.3.0 is the first source version with the Zirq identity. The tap keeps
+its verified 0.2.0 archive until a Zirq release is published; the cask updater
+then switches both the archive and bundle names together.
+
+The top-level CMake project is `zirq`. Internal library targets, QML modules,
+translation domains and `KwiLaunchPreset`
+files retain their upstream names. The existing `kwirc`, `kwiterminalrc`, `kwistaterc`,
+shortcut collections and `kwi/` data directories remain the profile locations.
+This preserves user data and keeps upstream synchronization manageable.
+
+Diagnostics use `ZIRQ_TRACE` and `ZIRQ_TRACE_MARKER`; the old `KWI_TRACE`
+variables remain accepted for existing developer scripts. New bundles record
+provenance in `zirq-bundle.json`, including the icon and metadata input hashes.
+
+`logo.svg` is the vector source for the Zirq mark. Regenerate the 1024-pixel
+`logo.png` with `rsvg-convert -w 1024 -h 1024 -o logo.png logo.svg`; the Mac build
+generates its Retina icon from that image.

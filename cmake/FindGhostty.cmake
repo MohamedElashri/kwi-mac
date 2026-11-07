@@ -33,7 +33,7 @@ block(SCOPE_FOR VARIABLES PROPAGATE Ghostty_FOUND Ghostty_VERSION)
         endforeach()
         list(PREPEND CMAKE_PREFIX_PATH ${_Ghostty_roots})
 
-        find_package(ghostty-vt QUIET CONFIG)
+        find_package(ghostty-vt ${Ghostty_FIND_VERSION} QUIET CONFIG)
 
         if(ghostty-vt_FOUND)
             set(Ghostty_VERSION "${ghostty-vt_VERSION}")
@@ -46,17 +46,6 @@ block(SCOPE_FOR VARIABLES PROPAGATE Ghostty_FOUND Ghostty_VERSION)
             find_package(PkgConfig QUIET)
 
             if(PkgConfig_FOUND)
-                if(NOT CMAKE_CROSSCOMPILING AND NOT CMAKE_SYSROOT AND "$ENV{PKG_CONFIG_SYSROOT_DIR}" STREQUAL "")
-                    pkg_get_variable(_Ghostty_prefix libghostty-vt prefix)
-
-                    if(_Ghostty_prefix AND NOT IS_DIRECTORY "${_Ghostty_prefix}")
-                        # HACK: Ghostty 1.4 includes DESTDIR in its pkg-config prefix.
-                        # Relocate an absent native prefix until this is fixed upstream.
-                        # Keep caller arguments last so explicit overrides still win.
-                        list(PREPEND PKG_CONFIG_ARGN --define-prefix)
-                    endif()
-                endif()
-
                 pkg_check_modules(PC_Ghostty QUIET IMPORTED_TARGET libghostty-vt)
             endif()
 
@@ -97,48 +86,7 @@ block(SCOPE_FOR VARIABLES PROPAGATE Ghostty_FOUND Ghostty_VERSION)
         endif()
     endif()
 
-    include(CMakePushCheckState)
-    include(CheckCSourceCompiles)
-
-    cmake_push_check_state(RESET)
-    set(CMAKE_REQUIRED_LIBRARIES "${_Ghostty_target}")
-    set(CMAKE_REQUIRED_QUIET "${Ghostty_FIND_QUIETLY}")
-
-    unset(Ghostty_HAS_REQUIRED_API CACHE)
-
-    if(_Ghostty_target)
-        check_c_source_compiles([=[
-        #include <ghostty/vt.h>
-        typedef void (*ApiFunction)(void);
-        static ApiFunction volatile required[] = {
-            (ApiFunction)ghostty_render_state_image_get_multi,
-            (ApiFunction)ghostty_render_state_image_iterator_new,
-            (ApiFunction)ghostty_search_get_multi,
-            (ApiFunction)ghostty_search_feed,
-            (ApiFunction)ghostty_search_tick,
-            (ApiFunction)ghostty_selection_gesture_event,
-            (ApiFunction)ghostty_terminal_selection_adjust,
-            (ApiFunction)ghostty_kitty_graphics_animation_tick,
-            (ApiFunction)ghostty_unicode_grapheme_width,
-            (ApiFunction)ghostty_color_perceived_luminance,
-            (ApiFunction)ghostty_color_scheme_report_encode,
-        };
-        int main(void) {
-            GhosttyTerminalOption history_limit = GHOSTTY_TERMINAL_OPT_SCROLLBACK_MAX_LINES;
-            GhosttyTerminalOption pwd_changed = GHOSTTY_TERMINAL_OPT_PWD_CHANGED;
-            return required[0] == 0 || history_limit == GHOSTTY_TERMINAL_OPT_SCROLLBACK_MAX_BYTES || pwd_changed == history_limit;
-        }
-        ]=] Ghostty_HAS_REQUIRED_API)
-
-        if(NOT Ghostty_HAS_REQUIRED_API)
-            string(CONCAT _Ghostty_failure
-                "The selected libghostty-vt lacks APIs required by Kwi or cannot be linked. "
-                "Install a compatible development version. "
-                "See the configure log for the failed compile/link check."
-            )
-        endif()
-    else()
-        set(Ghostty_HAS_REQUIRED_API FALSE)
+    if(NOT _Ghostty_target)
         string(CONCAT _Ghostty_failure
             "Install libghostty-vt with its CMake package or pkg-config metadata. "
             "The pkg-config route also requires the pkg-config executable. "
@@ -147,11 +95,9 @@ block(SCOPE_FOR VARIABLES PROPAGATE Ghostty_FOUND Ghostty_VERSION)
         )
     endif()
 
-    cmake_pop_check_state()
-
     include(FindPackageHandleStandardArgs)
     find_package_handle_standard_args(Ghostty
-        REQUIRED_VARS _Ghostty_target Ghostty_HAS_REQUIRED_API
+        REQUIRED_VARS _Ghostty_target
         VERSION_VAR Ghostty_VERSION
         HANDLE_VERSION_RANGE
         REASON_FAILURE_MESSAGE "${_Ghostty_failure}"

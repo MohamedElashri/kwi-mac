@@ -168,6 +168,15 @@ void BidiLayout::update(const Frame &frame, bool enabled)
                     row.levels[source + part] = ubidi_getLevelAt(line.get(), unit);
                 }
             }
+            // A wide glyph may leave a zero-width spacer at the wrap margin.
+            // It has a physical cell but contributes no paragraph text. Keep
+            // that padding at the visual margin without adding a fake space.
+            for (int source = 0; source < cells.size(); ++source) {
+                if (row.logicalToVisual[source] < 0 && !cells[source].width) {
+                    row.logicalToVisual[source] = destination;
+                    row.visualToLogical[destination++] = source;
+                }
+            }
             if (destination != cells.size()) {
                 error = U_INTERNAL_PROGRAM_ERROR;
                 break;

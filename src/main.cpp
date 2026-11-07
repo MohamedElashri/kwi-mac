@@ -12,6 +12,7 @@
 #include "ui/AppShortcuts.h"
 
 #include <KAboutData>
+#include <KConfig>
 #ifdef Q_OS_MACOS
 #include "LocalActivation.h"
 #include "MacLaunch_p.h"
@@ -26,8 +27,8 @@
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
-#include <QDebug>
 #include <QDir>
+#include <QLatin1Char>
 #include <QQuickWindow>
 #include <QString>
 #include <QStringList>
@@ -80,10 +81,12 @@ namespace
 int main(int argc, char **argv)
 {
     const auto processStart{Kwi::traceTime()};
-    const int traceLevel{qEnvironmentVariableIntValue("KWI_TRACE")};
+    const int traceLevel{qEnvironmentVariableIntValue(qEnvironmentVariableIsSet("ZIRQ_TRACE") ? "ZIRQ_TRACE" : "KWI_TRACE")};
     const bool tracing{traceLevel == 1 || traceLevel == 2};
-    const auto traceMarker{qEnvironmentVariable("KWI_TRACE_MARKER")};
-    qunsetenv("KWI_TRACE"); // App diagnostics must not leak into child shells.
+    const auto traceMarker{qEnvironmentVariable(qEnvironmentVariableIsSet("ZIRQ_TRACE_MARKER") ? "ZIRQ_TRACE_MARKER" : "KWI_TRACE_MARKER")};
+    qunsetenv("ZIRQ_TRACE"); // App diagnostics must not leak into child shells.
+    qunsetenv("ZIRQ_TRACE_MARKER");
+    qunsetenv("KWI_TRACE");
     qunsetenv("KWI_TRACE_MARKER");
 #ifdef Q_OS_MACOS
     KIconTheme::initTheme();
@@ -92,12 +95,14 @@ int main(int argc, char **argv)
     QQuickWindow::setDefaultAlphaBuffer(true);
     const auto applicationStart{Kwi::traceTime()};
     QApplication app{argc, argv};
-    app.setProperty("kwiTrace", tracing);
-    app.setProperty("kwiTraceLevel", traceLevel);
-    app.setProperty("kwiTraceMarker", traceMarker);
+    app.setProperty("zirqTrace", tracing);
+    app.setProperty("zirqTraceLevel", traceLevel);
+    app.setProperty("zirqTraceMarker", traceMarker);
     if (tracing) {
         Kwi::trace(QStringLiteral("startup"), {{QStringLiteral("main_start_ns"), processStart}, {QStringLiteral("application_start_ns"), applicationStart}});
     }
+    // Keep shortcuts and framework preferences in the established user profile.
+    KConfig::setMainConfigName(QStringLiteral("kwirc"));
     KirigamiAppDefaults::apply(&app);
     Kwi::traceStage(QStringLiteral("kirigami-defaults"));
     QCoreApplication::setApplicationName(QStringLiteral(KWI_EXECUTABLE));
@@ -133,9 +138,7 @@ int main(int argc, char **argv)
     const QString error{commandLineError(parser)};
 
     if (!error.isEmpty()) {
-        qCritical().noquote() << error;
-
-        return 2;
+        QCommandLineParser::showMessageAndExit(QCommandLineParser::MessageType::Error, error + QLatin1Char{'\n'}, 2);
     }
 
     QString callerDirectory{QDir::currentPath()};

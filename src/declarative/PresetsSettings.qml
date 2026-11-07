@@ -554,7 +554,7 @@ SettingsPage {
         id: importDialog
 
         title: KI18n.i18nc("@title:window", "Import Terminal Preset")
-        nameFilters: [KI18n.i18nc("@item:inlistbox", "Kwi Launch Presets (*.preset)")]
+        nameFilters: [KI18n.i18nc("@item:inlistbox", "Zirq Launch Presets (*.preset)")]
 
         onAccepted: root.terminalPresets.importPreset(selectedFile)
     }

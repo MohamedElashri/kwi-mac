@@ -5,6 +5,7 @@
 #include "OutputSaveJob.h"
 #include "SessionModel.h"
 #include "TerminalSession.h"
+#include "kwi-config.h"
 
 #include <KIO/CommandLauncherJob>
 #include <KIO/OpenUrlJob>
@@ -38,7 +39,7 @@ void DesktopIntegration::initializeApplicationIcon()
         QIcon::setFallbackSearchPaths(QIcon::fallbackSearchPaths() << resourcePath);
     }
 
-    QGuiApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("org.kde.kwi")));
+    QGuiApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral(KWI_APP_ID)));
 }
 
 namespace
@@ -291,7 +292,7 @@ void DesktopIntegration::notify(TerminalSession *session, const QString &event, 
 
     auto *notification = new KNotification{event, KNotification::CloseOnTimeout, this};
     notification->setComponentName(QStringLiteral("kwi"));
-    notification->setIconName(QStringLiteral("org.kde.kwi"));
+    notification->setIconName(QStringLiteral(KWI_APP_ID));
     notification->setTitle(title);
     notification->setText(text.left(maximumNotificationLength).toHtmlEscaped());
     notification->setUrgency(KNotification::NormalUrgency);

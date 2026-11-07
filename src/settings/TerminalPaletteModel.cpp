@@ -217,7 +217,7 @@ bool TerminalPaletteModel::removeScheme(const QString &id)
     const QString path{ownedTerminalPalettePath(id)};
 
     if (path.isEmpty() || !QFile::remove(path)) {
-        setError(i18nc("@info", "Only color schemes imported or created in Kwi can be removed."));
+        setError(i18nc("@info", "Only color schemes imported or created in Zirq can be removed."));
 
         return false;
     }

@@ -111,7 +111,7 @@ private Q_SLOTS:
         launch.environmentChanges.insert(QStringLiteral("COLORTERM"), std::nullopt);
         QVERIFY(process.start(launch));
         QTRY_VERIFY_WITH_TIMEOUT(!process.isRunning(), 5000);
-        QTRY_VERIFY_WITH_TIMEOUT(output.contains("TERM_PROGRAM=kwi"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(output.contains("TERM_PROGRAM=zirq"), 3000);
         QVERIFY(output.startsWith("UTF-8\r\n"));
         QVERIFY(output.contains("CUSTOM=override literal ; $HOME\r\n"));
         QVERIFY(output.contains("TERM=xterm-256color\r\n"));

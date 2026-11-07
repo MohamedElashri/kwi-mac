@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import plistlib
 from pathlib import Path
 import subprocess
 import time
@@ -27,6 +28,7 @@ def main():
     ensure_kwi_not_running()
     app, output = args.app.resolve(), args.output.resolve()
     binary = executable(app)
+    version = plistlib.loads((app / "Contents/Info.plist").read_bytes())["CFBundleShortVersionString"]
     output.mkdir(parents=True, exist_ok=False)
     home = output / "home"
     isolated_profile(home, 741, 510, 1, 100000)
@@ -46,7 +48,7 @@ from pathlib import Path
 target = Path(sys.argv[1])
 data = {"pid": os.getpid(), "parent_pid": os.getppid(), "cwd": os.getcwd(),
         "arguments": sys.argv[2:], "environment": {k: os.environ.get(k) for k in
-        ("TERM", "COLORTERM", "TERM_PROGRAM", "LANG", "KWI_PRESET")}}
+        ("TERM", "COLORTERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "LANG", "KWI_PRESET")}}
 temporary = target.with_suffix(".partial")
 temporary.write_text(json.dumps(data))
 os.replace(temporary, target)
@@ -55,7 +57,7 @@ print("KWI_COMPATIBILITY_CAPTURE", flush=True)
     env = {key: os.environ[key] for key in ("USER", "LOGNAME") if key in os.environ}
     env.update(HOME=str(home), CFFIXED_USER_HOME=str(home), PATH="/usr/bin:/bin:/usr/sbin:/sbin",
                DBUS_SESSION_BUS_ADDRESS="unix:path=" + str(output / "absent-bus.socket"),
-               KWI_TRACE="2", KWI_TRACE_MARKER="KWI_COMPATIBILITY_CAPTURE")
+               ZIRQ_TRACE="2", ZIRQ_TRACE_MARKER="KWI_COMPATIBILITY_CAPTURE")
     literal = ["space argument", "", "literal ; $HOME $(false)", "Unicode-é"]
     cases = []
     pending = []
@@ -78,7 +80,7 @@ print("KWI_COMPATIBILITY_CAPTURE", flush=True)
                     raise RuntimeError("Literal/empty argument fidelity differs")
                 if data["parent_pid"] != primary.pid:
                     raise RuntimeError("Forwarding reached a different app process")
-                for key, value in {"TERM": "xterm-256color", "COLORTERM": "truecolor", "TERM_PROGRAM": "kwi"}.items():
+                for key, value in {"TERM": "xterm-256color", "COLORTERM": "truecolor", "TERM_PROGRAM": "zirq", "TERM_PROGRAM_VERSION": version}.items():
                     if data["environment"][key] != value:
                         raise RuntimeError("Terminal environment differs: " + key)
                 if not (data["environment"]["LANG"] or "").endswith(".UTF-8"):

@@ -34,13 +34,13 @@ inline bool advanceTraceMarker(QByteArray &tail, const QByteArray &marker, const
 
 inline bool traceEnabled()
 {
-    static const bool enabled{QCoreApplication::instance() && QCoreApplication::instance()->property("kwiTrace").toBool()};
+    static const bool enabled{QCoreApplication::instance() && QCoreApplication::instance()->property("zirqTrace").toBool()};
     return enabled;
 }
 
 inline bool traceVerbose()
 {
-    static const bool enabled{traceEnabled() && QCoreApplication::instance()->property("kwiTraceLevel").toInt() != 2};
+    static const bool enabled{traceEnabled() && QCoreApplication::instance()->property("zirqTraceLevel").toInt() != 2};
     return enabled;
 }
 
@@ -53,7 +53,7 @@ inline void trace(const QString &kind, QJsonObject fields = {})
 {
     fields.insert(QStringLiteral("kind"), kind);
     fields.insert(QStringLiteral("time_ns"), traceTime());
-    qInfo().noquote() << "KWI_TRACE" << QJsonDocument{fields}.toJson(QJsonDocument::Compact);
+    qInfo().noquote() << "ZIRQ_TRACE" << QJsonDocument{fields}.toJson(QJsonDocument::Compact);
 }
 
 inline void traceStage(const QString &name)

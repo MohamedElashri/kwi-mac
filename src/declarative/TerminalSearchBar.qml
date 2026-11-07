@@ -42,6 +42,14 @@ Controls.ToolBar {
             terminal.find(findField.text, forward);
     }
 
+    Connections {
+        target: root.terminal
+
+        function onSessionChanged(): void {
+            root.cancelPendingSearch();
+        }
+    }
+
     RowLayout {
         id: searchControls
 
@@ -51,12 +59,11 @@ Controls.ToolBar {
         Kirigami.Theme.colorSet: Kirigami.Theme.View
         Kirigami.Theme.inherit: false
 
-        Controls.TextField {
+        TerminalSearchField {
             id: findField
 
-            readonly property bool hasResults: text.length > 0 && root.terminal.searchMatchCount >= 0
-
             objectName: "findField"
+            matchCount: root.terminal.searchMatchCount
             // The status padding depends on width, so exclude it from implicitWidth.
             implicitWidth: Kirigami.Units.gridUnit * 24
             Layout.fillWidth: true
@@ -66,7 +73,7 @@ Controls.ToolBar {
             Accessible.searchEdit: true
             Kirigami.Theme.colorSet: Kirigami.Theme.View
             Kirigami.Theme.inherit: false
-            Kirigami.Theme.backgroundColor: !hasResults ? searchControls.Kirigami.Theme.backgroundColor : root.terminal.searchMatchCount > 0 ? searchControls.Kirigami.Theme.positiveBackgroundColor : searchControls.Kirigami.Theme.negativeBackgroundColor
+            Kirigami.Theme.backgroundColor: !hasResults ? searchControls.Kirigami.Theme.backgroundColor : matchCount > 0 ? searchControls.Kirigami.Theme.positiveBackgroundColor : searchControls.Kirigami.Theme.negativeBackgroundColor
             palette.base: Kirigami.Theme.backgroundColor
 
             // Reserve status space so updates don't move the text or buttons.

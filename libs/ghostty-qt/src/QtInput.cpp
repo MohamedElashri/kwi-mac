@@ -159,7 +159,7 @@ constexpr GhosttyKey logicalKey(int key, Qt::KeyboardModifiers mods)
     }
 }
 
-GhosttyKey physicalKey(const QKeyEvent &event)
+GhosttyKey keyForEvent(const QKeyEvent &event)
 {
     // TODO: Verify FreeBSD Wayland events and resolve FreeBSD X11 keys through XKB names.
     // Its X11 keycode tables can differ from Linux's evdev map.
@@ -175,6 +175,14 @@ GhosttyKey physicalKey(const QKeyEvent &event)
             const bool control{(event.key() == Qt::Key_Control) == QCoreApplication::testAttribute(Qt::AA_MacDontSwapCtrlAndMeta)};
             return control ? GHOSTTY_KEY_CONTROL_LEFT : GHOSTTY_KEY_META_LEFT;
         }
+        return logicalKey(event.key(), event.modifiers());
+    }
+
+    // Preserve functional keys reported by Qt, including synthesized arrows
+    // used for alternate-screen scrolling. Their absent native keycode is zero,
+    // which would otherwise be mistaken for ANSI A. Modifier sides still use
+    // Cocoa's native metadata below.
+    if ((event.key() <= Qt::Key_Space || event.key() > 0x10ffff) && !(event.key() >= Qt::Key_Shift && event.key() <= Qt::Key_ScrollLock)) {
         return logicalKey(event.key(), event.modifiers());
     }
 
@@ -422,6 +430,36 @@ GhosttyKey physicalKey(const QKeyEvent &event)
         return logicalKey(event.key(), event.modifiers());
     }
 
+    // Qt's special keys lie above the Unicode range. Preserve their layout
+    // meaning, along with Space and unidentified keys, rather than treating them
+    // as physical writing-system keys.
+    if (event.key() <= Qt::Key_Space || event.key() > 0x10ffff) {
+        // X11/XKB protocol keysyms carried by QKeyEvent::nativeVirtualKey().
+        // We need these to distinguish modifier sides even when the keys are
+        // remapped. Including these is a bit unorthodox, but it saves us a
+        // dependency on libxkbcommon and they're virtually guaranteed to
+        // never change.
+        constexpr auto xkbShiftRight{0xffe2u};
+        constexpr auto xkbControlRight{0xffe4u};
+        constexpr auto xkbMetaRight{0xffe8u};
+        constexpr auto xkbAltRight{0xffeau};
+        constexpr auto xkbSuperRight{0xffecu};
+        const auto key = logicalKey(event.key(), event.modifiers());
+
+        switch (event.key()) {
+        case Qt::Key_Shift:
+            return event.nativeVirtualKey() == xkbShiftRight ? GHOSTTY_KEY_SHIFT_RIGHT : key;
+        case Qt::Key_Control:
+            return event.nativeVirtualKey() == xkbControlRight ? GHOSTTY_KEY_CONTROL_RIGHT : key;
+        case Qt::Key_Alt:
+            return event.nativeVirtualKey() == xkbAltRight ? GHOSTTY_KEY_ALT_RIGHT : key;
+        case Qt::Key_Meta:
+            return event.nativeVirtualKey() == xkbSuperRight || event.nativeVirtualKey() == xkbMetaRight ? GHOSTTY_KEY_META_RIGHT : key;
+        default:
+            return key;
+        }
+    }
+
     switch (event.nativeScanCode() - 8) {
     case KEY_A:
         return GHOSTTY_KEY_A;
@@ -523,22 +561,6 @@ GhosttyKey physicalKey(const QKeyEvent &event)
         return GHOSTTY_KEY_INTL_RO;
     case KEY_YEN:
         return GHOSTTY_KEY_INTL_YEN;
-    case KEY_LEFTSHIFT:
-        return GHOSTTY_KEY_SHIFT_LEFT;
-    case KEY_RIGHTSHIFT:
-        return GHOSTTY_KEY_SHIFT_RIGHT;
-    case KEY_LEFTCTRL:
-        return GHOSTTY_KEY_CONTROL_LEFT;
-    case KEY_RIGHTCTRL:
-        return GHOSTTY_KEY_CONTROL_RIGHT;
-    case KEY_LEFTALT:
-        return GHOSTTY_KEY_ALT_LEFT;
-    case KEY_RIGHTALT:
-        return GHOSTTY_KEY_ALT_RIGHT;
-    case KEY_LEFTMETA:
-        return GHOSTTY_KEY_META_LEFT;
-    case KEY_RIGHTMETA:
-        return GHOSTTY_KEY_META_RIGHT;
     default:
         return logicalKey(event.key(), event.modifiers());
     }
@@ -580,7 +602,7 @@ GhosttyMods ghosttyModifiers(Qt::KeyboardModifiers mods)
 KeyInput keyInput(const QKeyEvent &event, bool optionAsAlt)
 {
     KeyInput result;
-    result.key = physicalKey(event);
+    result.key = keyForEvent(event);
     result.action = event.type() == QEvent::KeyRelease ? GHOSTTY_KEY_ACTION_RELEASE
         : event.isAutoRepeat()                         ? GHOSTTY_KEY_ACTION_REPEAT
                                                        : GHOSTTY_KEY_ACTION_PRESS;

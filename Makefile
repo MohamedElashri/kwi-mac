@@ -20,7 +20,7 @@ ASSETS_DIR ?= $(BUILD_DIR)/release-assets
 DEPENDENCIES ?= $(BUILD_DIR)/dependencies.json
 TEST_BUILD ?= $(PREFIX)/build/kwi/kwi/work/build
 RESULTS_DIR ?= $(BUILD_DIR)/results
-APP ?= $(BUILD_DIR)/stage/Kwi.app
+APP ?= $(BUILD_DIR)/stage/Zirq.app
 ARGS ?=
 EXPECTED_COMMIT ?=
 export EXPECTED_COMMIT
@@ -83,7 +83,7 @@ record-dependencies: build ## Audit installed dependencies and save their proven
 bundle: build ## Deploy and sign a standalone development app
 	"$(PYTHON)" scripts/macos/bundle.py --prefix "$(PREFIX)" --output "$(APP)" $(ARGS)
 
-run: bundle ## Build, deploy and open Kwi
+run: bundle ## Build, deploy and open Zirq
 	open "$(APP)"
 
 package: doctor sources test-native record-dependencies ## Build, test and verify the distributable app and sources
@@ -119,7 +119,7 @@ ci-changes: ## Classify CI changes; docs and distribution skip the native build
 	if [ "$${CI_EVENT:-}" = cask ]; then \
 	  [[ "$${GITHUB_REF_NAME:-}" =~ ^automation/homebrew-v[0-9]+\.[0-9]+\.[0-9]+$$ ]] || { echo 'Cask checks require an automation branch' >&2; exit 1; }; \
 	  git merge-base --is-ancestor HEAD^ origin/main || { echo 'Cask parent must already be on main' >&2; exit 1; }; \
-	  [ "$$(git diff --name-only --no-renames HEAD^ HEAD --)" = Casks/kwi-mac.rb ] || { echo 'Cask checks require exactly one cask file change' >&2; exit 1; }; \
+	  [ "$$(git diff --name-only --no-renames HEAD^ HEAD --)" = Casks/zirq.rb ] || { echo 'Cask checks require exactly one cask file change' >&2; exit 1; }; \
 	fi; \
 	if [ "$${CI_EVENT:-}" != workflow_dispatch ] && [ "$${CI_IS_TAG:-false}" != true ] \
 	   && [ -n "$$base" ] && [ "$$base" != 0000000000000000000000000000000000000000 ]; then \
@@ -141,14 +141,14 @@ workloads: ## Generate deterministic GUI/performance fixtures
 smoke: ## Smoke-test an existing APP with an isolated profile
 	"$(PYTHON)" scripts/macos/smoke.py --app "$(APP)" --output "$(RESULTS_DIR)/smoke.json" --isolated-profile $(ARGS)
 
-startup: ## Measure startup of an existing APP (requires no running Kwi)
+startup: ## Measure startup of an existing APP (requires no running Zirq)
 	"$(PYTHON)" scripts/macos/startup.py --app "$(APP)" --output "$(RESULTS_DIR)/startup" --child-helper "$(TEST_BUILD)/bin/test-macos-startup-child" $(ARGS)
 
 benchmark: ## Benchmark an existing APP; supply workload/options in ARGS
-	"$(PYTHON)" scripts/macos/benchmark.py --app "$(APP)" --terminal kwi --output "$(RESULTS_DIR)/benchmark" $(ARGS)
+	"$(PYTHON)" scripts/macos/benchmark.py --app "$(APP)" --terminal zirq --output "$(RESULTS_DIR)/benchmark" $(ARGS)
 
 memory: ## Run the isolated app memory campaign
-	"$(PYTHON)" scripts/macos/memory.py --app "$(APP)" --output "$(RESULTS_DIR)/memory" --metrics-tool "$(TEST_BUILD)/bin/test-native-process.app/Contents/MacOS/test-native-process" $(ARGS)
+	"$(PYTHON)" scripts/macos/memory.py --app "$(APP)" --output "$(RESULTS_DIR)/memory" --metrics-tool "$(TEST_BUILD)/bin/test-macos-performance.app/Contents/MacOS/test-macos-performance" $(ARGS)
 
 compatibility: ## Check CLI, presets and activation of an existing APP
 	"$(PYTHON)" scripts/macos/compatibility.py --app "$(APP)" --output "$(RESULTS_DIR)/compatibility" $(ARGS)

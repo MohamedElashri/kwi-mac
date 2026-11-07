@@ -399,12 +399,12 @@ private Q_SLOTS:
         // No shell profile, desktop pixels or real user/host/path data is included.
         m_session->feed(
             "\033[2J\033[H\r\n"
-            "  \033[1;38;2;124;191;255mKwi for macOS\033[0m\r\n"
+            "  \033[1;38;2;124;191;255mZirq for macOS\033[0m\r\n"
             "  A terminal workspace for Apple Silicon.\r\n\r\n"
             "  \033[38;2;132;210;158m>\033[0m make help\r\n\r\n"
             "    \033[38;2;124;191;255mbuild\033[0m       Compile the application\r\n"
             "    \033[38;2;124;191;255mtest\033[0m        Run tooling and native tests\r\n"
-            "    \033[38;2;124;191;255mrun\033[0m         Open Kwi\r\n"
+            "    \033[38;2;124;191;255mrun\033[0m         Open Zirq\r\n"
             "    \033[38;2;124;191;255mpackage\033[0m     Create a verified application bundle\r\n"
             "    \033[38;2;124;191;255mci\033[0m          Build, test and package\r\n\r\n"
             "  \033[38;2;132;210;158m>\033[0m ./colors\r\n\r\n"
@@ -1360,8 +1360,11 @@ int main(int argc, char **argv)
     QApplication app{argc, argv};
     KLocalizedString::setApplicationDomain("kwi");
     KAboutData::setApplicationData(Kwi::applicationAboutData());
-    QCoreApplication::setApplicationName(QStringLiteral("kwi-macos-interaction-test"));
+    QCoreApplication::setApplicationName(QStringLiteral("zirq-macos-interaction-test"));
     if (helper) {
+        // A Kwi writer and Zirq reader must share customized shortcuts.
+        QCoreApplication::setApplicationName(argc == 4 ? QStringLiteral("kwi") : QStringLiteral("zirq"));
+        KConfig::setMainConfigName(QStringLiteral("kwirc"));
         KirigamiAppDefaults::apply(qApp);
         Kwi::AppShortcuts shortcuts;
         auto *collection = KirigamiActions::ActionCollections::self()->collection(QStringLiteral("org.kde.kwi.tabs"));

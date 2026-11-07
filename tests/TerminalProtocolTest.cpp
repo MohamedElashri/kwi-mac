@@ -35,6 +35,8 @@ private Q_SLOTS:
     {
         QTest::addColumn<QString>("text");
         QTest::newRow("leading-isolate") << QStringLiteral("\u2067العربية 123\u2069");
+        QTest::newRow("after-wide-glyph") << QStringLiteral("界\u2067العربية\u2069");
+        QTest::newRow("ascii-isolate") << QStringLiteral("\u2067ASCII 123\u2069");
         QTest::newRow("leading-mark") << QStringLiteral("\u200f(שלום) 123");
         QTest::newRow("embedding-on-space") << QStringLiteral("a \u202bשלום 123\u202c z");
         QTest::newRow("closing-control-on-space") << QStringLiteral("a \u2067مرحبا \u2069");
@@ -82,6 +84,24 @@ private Q_SLOTS:
         terminal.feed("\033cOK");
         terminal.selectAll();
         QCOMPARE(terminal.selectionText(), QStringLiteral("OK"));
+    }
+
+    void pendingDirectionControlsDoNotLeakAcrossScreens()
+    {
+        GhosttyQt::Terminal terminal{40, 4};
+        QVERIFY(terminal.feed(QStringLiteral("\u2067").toUtf8()));
+        QVERIFY(terminal.feed("\033[?1049halternate"));
+        QCOMPARE(terminal.historyText(), QStringLiteral("alternate"));
+        QVERIFY(terminal.feed("\033[?1049lprimary"));
+        QCOMPARE(terminal.historyText(), QStringLiteral("primary"));
+        QVERIFY(terminal.feed("\033c"));
+        QVERIFY(terminal.feed(QString(10000, QChar{0x2067}).toUtf8()));
+        QVERIFY(terminal.feed("OK"));
+        const auto text = terminal.historyText();
+        QVERIFY(text.endsWith(QLatin1String("OK")));
+        QVERIFY(text.size() < 10000); // Malformed control-only input is bounded.
+        QVERIFY(terminal.feed("\033cusable"));
+        QCOMPARE(terminal.historyText(), QStringLiteral("usable"));
     }
 
     void synchronizedOutputReleaseAndTimeout()

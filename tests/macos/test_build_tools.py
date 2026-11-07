@@ -35,13 +35,32 @@ class BuildToolsTest(unittest.TestCase):
             record = prefix / "share/kwi/ghostty-build-inputs.json"
             record.parent.mkdir(parents=True)
             expected = [{"path": str(patch.relative_to(root)), "sha256": hashlib.sha256(patch.read_bytes()).hexdigest()}]
-            record.write_text(json.dumps({"patches": expected}))
+            sources = root / "craft/ghostty-sources.json"
+            sources.write_text('{"ghostty_version":"old"}')
+            record.write_text(json.dumps({"patches": expected, "sources": json.loads(sources.read_text())}))
             with mock.patch.object(craft, "ROOT", root), mock.patch.object(craft, "run") as run:
                 craft.refresh_vt_patches(prefix, {})
                 run.assert_not_called()
                 patch.write_text("changed revision")
                 craft.refresh_vt_patches(prefix, {})
                 self.assertIn("--unpack", run.call_args.args[0])
+                self.assertEqual(run.call_args.args[0][-1], "kwi/libghostty-vt")
+
+    def test_cached_vt_rebuilds_when_source_release_changes(self):
+        craft = load("craft")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sources = root / "craft/ghostty-sources.json"
+            sources.parent.mkdir()
+            sources.write_text('{"ghostty_version":"1.0.0"}')
+            prefix = root / "prefix"
+            record = prefix / "share/kwi/ghostty-build-inputs.json"
+            record.parent.mkdir(parents=True)
+            record.write_text(json.dumps({"patches": [], "sources": {"ghostty_version": "1.4.0"}}))
+            with mock.patch.object(craft, "ROOT", root), mock.patch.object(craft, "run") as run:
+                craft.refresh_vt_patches(prefix, {})
+                self.assertIn("--unpack", run.call_args.args[0])
+                self.assertIn("--make", run.call_args.args[0])
                 self.assertEqual(run.call_args.args[0][-1], "kwi/libghostty-vt")
 
     def test_invalid_job_count_does_not_modify_a_prefix(self):
@@ -72,6 +91,27 @@ class BuildToolsTest(unittest.TestCase):
                 app_test_support.ensure_kwi_not_running(lock)
             self.assertTrue(lock.exists())
 
+    def test_trace_reader_accepts_zirq_and_historical_logs(self):
+        smoke = load("smoke")
+        self.assertEqual(smoke.records('Qt: ZIRQ_TRACE {"kind":"new"}\nQt: KWI_TRACE {"kind":"legacy"}'),
+                         [{"kind": "new"}, {"kind": "legacy"}])
+
+    def test_bundle_ownership_survives_the_rename_without_following_symlinks(self):
+        bundle = load("bundle")
+        with tempfile.TemporaryDirectory() as directory:
+            app = Path(directory) / "Zirq.app"
+            resources = app / "Contents/Resources"
+            resources.mkdir(parents=True)
+            legacy = resources / "kwi-bundle.json"
+            legacy.write_text(json.dumps({"owner": "kwi-macos-bundle"}))
+            self.assertTrue(bundle.owned_bundle(app))
+            current = resources / "zirq-bundle.json"
+            current.write_text(json.dumps({"owner": bundle.OWNER}))
+            self.assertTrue(bundle.owned_bundle(app))
+            current.unlink()
+            current.symlink_to(legacy)
+            self.assertFalse(bundle.owned_bundle(app))
+
     def test_output_completion_requires_matching_prepared_terminal(self):
         smoke = load("smoke")
         events = [
@@ -98,7 +138,7 @@ class BuildToolsTest(unittest.TestCase):
             (prefix / "lib").mkdir(parents=True)
             (prefix / "lib/libExample.6.1.dylib").write_bytes(b"library")
             (prefix / "lib/libExample.6.dylib").symlink_to("libExample.6.1.dylib")
-            app = root / "Kwi.app"
+            app = root / "Zirq.app"
             frameworks = app / "Contents/Frameworks"
             frameworks.mkdir(parents=True)
             (frameworks / "libExample.6.1.dylib").write_bytes(b"current image")
@@ -111,7 +151,7 @@ class BuildToolsTest(unittest.TestCase):
         bundle = load("bundle")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            app = root / "Kwi.app"
+            app = root / "Zirq.app"
             marker = app / "Contents/Resources/kwi-bundle.json"
             marker.parent.mkdir(parents=True)
             marker.write_text('{"owner":"kwi-macos-bundle"}')
@@ -126,7 +166,7 @@ class BuildToolsTest(unittest.TestCase):
         bundle = load("bundle")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            app = root / "Kwi.app"
+            app = root / "Zirq.app"
             app.mkdir()
             target = root / "external-data"
             target.write_text("external")
@@ -145,7 +185,7 @@ class BuildToolsTest(unittest.TestCase):
             hidden.mkdir()
             sentinel = hidden / "preserve"
             sentinel.write_text("other data")
-            with mock.patch("sys.argv", ["smoke.py", "--app", str(root / "Kwi.app"), "--output", str(root / "result.json"), "--hide-prefix", str(prefix)]), contextlib.redirect_stderr(io.StringIO()):
+            with mock.patch("sys.argv", ["smoke.py", "--app", str(root / "Zirq.app"), "--output", str(root / "result.json"), "--hide-prefix", str(prefix)]), contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(SystemExit):
                     smoke.main()
             self.assertEqual(sentinel.read_text(), "other data")

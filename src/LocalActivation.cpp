@@ -22,7 +22,7 @@ constexpr int timeoutMs{5000};
 
 LocalActivation::LocalActivation(const QString &endpoint, QObject *parent)
     : QObject{parent}
-    , m_endpoint{endpoint.isEmpty() ? QStringLiteral("/tmp/org.kde.kwi-%1.socket").arg(geteuid()) : endpoint}
+    , m_endpoint{endpoint.isEmpty() ? QStringLiteral("/tmp/com.elashri.zirq-%1.socket").arg(geteuid()) : endpoint}
 {
     m_server.setSocketOptions(QLocalServer::UserAccessOption);
     connect(&m_server, &QLocalServer::newConnection, this, [this] {

@@ -18,19 +18,19 @@ class ReleaseAssetsTest(unittest.TestCase):
 
     def fixture(self, root):
         root.mkdir()
-        (root / "Kwi-arm64.zip").write_bytes(b"verified app archive")
-        (root / "Kwi-sources.tar.gz").write_bytes(b"verified sources")
+        (root / "Zirq-arm64.zip").write_bytes(b"verified app archive")
+        (root / "Zirq-sources.tar.gz").write_bytes(b"verified sources")
         (root / "SOURCES.json").write_text(json.dumps({"project_commit": self.commit}))
         (root / "dependencies.json").write_text(json.dumps({"source_commit": self.commit}))
-        (root / "Kwi.bundle.json").write_text('{"reused_deployment": false}')
+        (root / "Zirq.bundle.json").write_text('{"reused_deployment": false}')
         (root / "README.txt").write_text("Install instructions")
         record = {"owner": self.package.OWNER, "source": {"source_commit": self.commit},
                   "full_deployment": True, "strict_signatures_original_and_extracted": True,
                   "archive_round_trip_bytes_modes_symlinks": True,
-                  "archive": {"name": "Kwi-arm64.zip", "sha256": self.package.digest(root / "Kwi-arm64.zip"),
-                              "bytes": (root / "Kwi-arm64.zip").stat().st_size},
-                  "source_distribution": {"archive": "Kwi-sources.tar.gz", "sha256": self.package.digest(root / "Kwi-sources.tar.gz")},
-                  "bundle_manifest_sha256": self.package.digest(root / "Kwi.bundle.json")}
+                  "archive": {"name": "Zirq-arm64.zip", "sha256": self.package.digest(root / "Zirq-arm64.zip"),
+                              "bytes": (root / "Zirq-arm64.zip").stat().st_size},
+                  "source_distribution": {"archive": "Zirq-sources.tar.gz", "sha256": self.package.digest(root / "Zirq-sources.tar.gz")},
+                  "bundle_manifest_sha256": self.package.digest(root / "Zirq.bundle.json")}
         (root / "package.json").write_text(json.dumps(record))
         self.checksums(root)
 
@@ -53,7 +53,7 @@ class ReleaseAssetsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "assets"
             self.fixture(root)
-            (root / "Kwi-arm64.zip").write_bytes(b"modified archive")
+            (root / "Zirq-arm64.zip").write_bytes(b"modified archive")
             with self.assertRaisesRegex(RuntimeError, "asset changed"):
                 self.package.verify_assets(root)
             self.checksums(root)
@@ -67,7 +67,7 @@ class ReleaseAssetsTest(unittest.TestCase):
             self.fixture(source)
             self.package.assemble_assets(source, source / "dependencies.json", output)
             before = self.package.snapshot(output)
-            (source / "Kwi-arm64.zip").write_bytes(b"invalid replacement")
+            (source / "Zirq-arm64.zip").write_bytes(b"invalid replacement")
             with self.assertRaisesRegex(RuntimeError, "metadata does not match"):
                 self.package.assemble_assets(source, source / "dependencies.json", output)
             self.assertEqual(self.package.snapshot(output), before)

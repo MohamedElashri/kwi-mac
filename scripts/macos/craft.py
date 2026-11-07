@@ -154,7 +154,9 @@ def refresh_vt_patches(prefix, env):
         return
     expected = [{"path": str(path.relative_to(ROOT)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
                 for path in sorted((ROOT / "craft/kwi/libghostty-vt").glob("*.patch"))]
-    if json.loads(record.read_text()).get("patches", []) == expected:
+    installed = json.loads(record.read_text())
+    sources = json.loads((ROOT / "craft/ghostty-sources.json").read_text())
+    if installed.get("patches", []) == expected and installed.get("sources") == sources:
         return
     # Re-extract the verified archive so an older local patch is never stacked
     # underneath its replacement. Compiler caches remain reusable.

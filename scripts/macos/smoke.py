@@ -26,8 +26,10 @@ def trace_clock_ns():
 def records(log):
     result = []
     for line in log.splitlines():
-        if "KWI_TRACE {" in line:
-            result.append(json.loads(line.split("KWI_TRACE ", 1)[1]))
+        for prefix in ("ZIRQ_TRACE ", "KWI_TRACE "):
+            if prefix + "{" in line:
+                result.append(json.loads(line.split(prefix, 1)[1]))
+                break
     return result
 
 
@@ -53,7 +55,7 @@ def main():
     app = args.app.resolve()
     work = args.output.resolve().parent
     work.mkdir(parents=True, exist_ok=True)
-    executable = app / "Contents/MacOS/kwi"
+    executable = app / "Contents/MacOS/zirq"
     log_path = work / "launch.log"
     marker = work / "child-marker.txt"
     forwarded_marker = work / "forwarded-marker.txt"
@@ -65,7 +67,7 @@ def main():
     if marker.exists():
         marker.unlink()
     env = {key: os.environ[key] for key in ("HOME", "USER", "LOGNAME") if key in os.environ}
-    env.update(PATH="/usr/bin:/bin:/usr/sbin:/sbin", LANG="en_US.UTF-8", KWI_TRACE="1", KWI_TRACE_MARKER="KWI_BUNDLE_SMOKE_READY", QSG_INFO="1")
+    env.update(PATH="/usr/bin:/bin:/usr/sbin:/sbin", LANG="en_US.UTF-8", ZIRQ_TRACE="1", ZIRQ_TRACE_MARKER="KWI_BUNDLE_SMOKE_READY", QSG_INFO="1")
     profile_home = work / "profile-home"
     if args.isolated_profile:
         profile_home.mkdir(exist_ok=True)
@@ -87,7 +89,7 @@ def main():
             hidden = candidate
         with log_path.open("w") as log:
             # $1 is a separate argv entry, including spaces/Unicode, never shell interpolation.
-            command = "printf 'KWI_BUNDLE_SMOKE_READY\\n'; printf '%s|%s|%s|%s|%s\\n' \"$TERM\" \"$COLORTERM\" \"$TERM_PROGRAM\" \"${KWI_TRACE-unset}\" \"$PWD\" > \"$1\""
+            command = "printf 'KWI_BUNDLE_SMOKE_READY\\n'; printf '%s|%s|%s|%s|%s\\n' \"$TERM\" \"$COLORTERM\" \"$TERM_PROGRAM\" \"${ZIRQ_TRACE-unset}\" \"$PWD\" > \"$1\""
             process = subprocess.Popen([str(executable), "--hold", "-e", "/bin/sh", "-c", command, "kwi-smoke", str(marker)],
                                        cwd="/", env=env, stdout=log, stderr=subprocess.STDOUT)
             deadline = time.monotonic() + 15
@@ -135,7 +137,7 @@ def main():
                       "frames": frames[:3], "pid": process.pid,
                       "limits": "Logical terminal marker plus frame-swapped callback, not measured pixel presentation or interactive GUI coverage."}
             # QSGRendererInterface::Metal == 6; a fallback backend is not a pass.
-            result["passed"] = bool(result["child_marker"] == "xterm-256color|truecolor|kwi|unset|/" and frames and graphics
+            result["passed"] = bool(result["child_marker"] == "xterm-256color|truecolor|zirq|unset|/" and frames and graphics
                                     and all(e["api"] == 6 for e in graphics) and submitted and forwarded and forwarded["passed"]
                                     and process.poll() is None)
             args.output.write_text(json.dumps(result, indent=2) + "\n")

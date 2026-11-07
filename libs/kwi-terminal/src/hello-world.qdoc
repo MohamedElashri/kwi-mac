@@ -1,0 +1,55 @@
+// SPDX-FileCopyrightText: 2026 Eike Hein <hein@kde.org>
+// SPDX-License-Identifier: CC-BY-SA-4.0
+
+/*!
+    \page kwi-terminal-hello-world.html
+    \title Hello World
+    \brief A minimal terminal window in QML.
+
+    This example opens an interactive shell in a window with a scrollbar.
+    Save it as \c Main.qml:
+
+    \qml
+    import QtQuick
+    import org.kde.kwi.terminal
+
+    Window {
+        width: 800
+        height: 500
+        visible: true
+        title: "Hello World"
+
+        Session {
+            id: shell
+            onExited: Qt.quit()
+        }
+
+        Terminal {
+            anchors.fill: parent
+            session: shell
+            focus: true
+        }
+
+        Component.onCompleted: shell.start()
+    }
+    \endqml
+
+    \l Session owns the process and terminal contents. Leaving
+    \l {Session::executable}{executable} unset selects the user's default shell.
+    The call to \l {Session::start()}{start()} launches it once the component is ready.
+
+    \l Terminal displays the session and provides the scrollbar. Setting
+    \l {Item::focus}{focus} lets it accept keyboard input. When the shell exits,
+    the \l {Session::exited()}{onExited} handler closes the application.
+
+    With the module and its dependencies installed in your QML import path,
+    run the file with Qt's \c qml tool:
+
+    \badcode
+    qml Main.qml
+    \endcode
+
+    Type a command to use the terminal, or enter \c exit to close the window.
+
+    \sa {Zirq Terminal QML Types}
+*/

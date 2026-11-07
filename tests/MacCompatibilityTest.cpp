@@ -60,7 +60,7 @@ bool writeJson(const QString &path, const QJsonObject &object)
     return file.open(QIODevice::WriteOnly | QIODevice::NewOnly) && file.write(QJsonDocument{object}.toJson()) > 0;
 }
 
-int persistentState(const QString &output, bool managed, bool profile = false)
+int persistentState(const QString &output, bool managed, bool profile = false, const QString &selectPreset = {})
 {
     if (managed) {
         const auto path = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
@@ -72,6 +72,8 @@ int persistentState(const QString &output, bool managed, bool profile = false)
     }
     Kwi::TerminalSettings settings;
     Kwi::TerminalPresets presets{&settings};
+    if (!selectPreset.isEmpty() && !presets.setDefaultPreset(selectPreset))
+        return 4;
     if (managed) {
         settings.setScrollbackLines(999);
         settings.setFontFamily(QStringLiteral("Courier"));
@@ -647,7 +649,8 @@ private Q_SLOTS:
 
 int main(int argc, char **argv)
 {
-    const bool profile = argc == 3 && !std::strcmp(argv[1], "--profile-state");
+    const bool selectProfile = argc == 4 && !std::strcmp(argv[1], "--profile-default");
+    const bool profile = selectProfile || (argc == 3 && !std::strcmp(argv[1], "--profile-state"));
     const bool helper = profile || (argc == 3 && (!std::strcmp(argv[1], "--persisted") || !std::strcmp(argv[1], "--managed")));
     if (!helper)
         recordMacTestProcess();
@@ -664,7 +667,10 @@ int main(int argc, char **argv)
     }
     KLocalizedString::setApplicationDomain("kwi");
     if (helper)
-        return persistentState(QString::fromLocal8Bit(argv[2]), !std::strcmp(argv[1], "--managed"), profile);
+        return persistentState(QString::fromLocal8Bit(argv[selectProfile ? 3 : 2]),
+                               !std::strcmp(argv[1], "--managed"),
+                               profile,
+                               selectProfile ? QString::fromLocal8Bit(argv[2]) : QString{});
     MacCompatibilityTest test;
     return QTest::qExec(&test, argc, argv);
 }

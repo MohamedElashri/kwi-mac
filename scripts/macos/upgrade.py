@@ -50,6 +50,38 @@ def launch(app, output, home, label):
                 process.wait(timeout=10)
 
 
+def seed_profile(output, home, probe):
+    preferences = home / "Library/Preferences"
+    (preferences / "State").mkdir(parents=True)
+    (preferences / "kwiterminalrc").write_text(
+        "[Appearance]\nUseSystemFont=false\nFontFamily=Menlo\nFontPointSize=11\nBackgroundOpacity=0.83\n"
+        "ColorScheme=user:migration.colorscheme\n[Terminal]\nScrollbackLines=321\nBidirectionalText=false\n"
+        "[Behavior]\nOptionAsAlt=true\n[Presets]\nDefaultPreset=system-shell\n")
+    (preferences / "kwirc").write_text("[Shortcuts][org.kde.kwi.tabs][new_tab]\nShortcut=Ctrl+Shift+Y\n")
+    (preferences / "State/kwistaterc").write_text("[MainWindow]\n1440x900 screen: Width=741\n1440x900 screen: Height=510\n")
+    presets = home / "Library/Application Support/kwi/presets"
+    presets.mkdir(parents=True)
+    (output / "preset directory").mkdir()
+    (presets / "migration.preset").write_text(
+        "[General]\nFormat=KwiLaunchPreset\nVersion=1\nName=Migration العربية\n"
+        "[Launch]\nDirectoryMode=Custom\nDirectory=" + str(output / "preset directory") + "\n"
+        "Environment=ZIRQ_MIGRATION=carried العربية\n")
+    palette = home / "Library/Application Support/kwi/color-schemes/user/migration.colorscheme"
+    palette.parent.mkdir(parents=True)
+    palette.write_text("[General]\nDescription=Migration colors\n[Foreground]\nColor=18,52,86\n[Background]\nColor=10,20,30\n")
+    (output / "capture.py").write_text(
+        "import json,os,sys\nfrom pathlib import Path\n"
+        "target=Path(sys.argv[1]); temporary=target.with_suffix('.partial')\n"
+        "temporary.write_text(json.dumps({'parent':os.getppid(),'cwd':os.getcwd(),"
+        "'preset':os.getenv('ZIRQ_MIGRATION'),'terminal':os.getenv('TERM_PROGRAM')}))\n"
+        "os.replace(temporary,target)\n")
+    # Presets are stored by Qt's canonical file-URL ID, rather than their
+    # display name. Use the native settings API to seed a genuine saved default.
+    profile_env = {**os.environ, "HOME": str(home), "CFFIXED_USER_HOME": str(home)}
+    run([probe.resolve(), "--profile-default", "Migration العربية", output / "profile-before.json"],
+        env=profile_env, capture_output=True, text=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--previous", type=Path, required=True, help="Published Kwi-arm64.zip and SHA256SUMS directory")
@@ -75,28 +107,7 @@ def main():
     if (info["CFBundleIdentifier"], info["CFBundleExecutable"]) != ("org.kde.kwi", "kwi"):
         raise RuntimeError("Expected the published Kwi predecessor")
     run(["/usr/bin/codesign", "--verify", "--deep", "--strict", old])
-    preferences = home / "Library/Preferences"
-    (preferences / "State").mkdir(parents=True)
-    (preferences / "kwiterminalrc").write_text(
-        "[Appearance]\nUseSystemFont=false\nFontFamily=Menlo\nFontPointSize=11\nBackgroundOpacity=0.83\n"
-        "ColorScheme=user:migration.colorscheme\n[Terminal]\nScrollbackLines=321\nBidirectionalText=false\n"
-        "[Behavior]\nOptionAsAlt=true\n[Presets]\nDefaultPreset=Migration العربية\n")
-    (preferences / "kwirc").write_text("[Shortcuts][org.kde.kwi.tabs][new_tab]\nShortcut=Ctrl+Shift+Y\n")
-    (preferences / "State/kwistaterc").write_text("[MainWindow]\n1440x900 screen: Width=741\n1440x900 screen: Height=510\n")
-    presets = home / "Library/Application Support/kwi/presets"
-    presets.mkdir(parents=True)
-    (output / "preset directory").mkdir()
-    (presets / "migration.preset").write_text(
-        "[General]\nFormat=KwiLaunchPreset\nVersion=1\nName=Migration العربية\n"
-        "[Launch]\nDirectoryMode=Custom\nDirectory=" + str(output / "preset directory") + "\n"
-        "Environment=ZIRQ_MIGRATION=carried العربية\n")
-    palette = home / "Library/Application Support/kwi/color-schemes/user/migration.colorscheme"
-    palette.parent.mkdir(parents=True)
-    palette.write_text("[General]\nDescription=Migration colors\n[Foreground]\nColor=18,52,86\n[Background]\nColor=10,20,30\n")
-    (output / "capture.py").write_text(
-        "import json,os,sys\nfrom pathlib import Path\n"
-        "Path(sys.argv[1]).write_text(json.dumps({'parent':os.getppid(),'cwd':os.getcwd(),"
-        "'preset':os.getenv('ZIRQ_MIGRATION'),'terminal':os.getenv('TERM_PROGRAM')}))\n")
+    seed_profile(output, home, args.probe)
     before_launch = launch(old, output, home, "kwi-before")
     if before_launch["terminal"] != "kwi":
         raise RuntimeError("The old bundle did not identify as Kwi")

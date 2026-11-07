@@ -16,6 +16,8 @@
 #include "ui/AppShortcuts.h"
 #include "ui/WebShortcutModel.h"
 #include <BreezeIcons>
+#include <ActionCollection/ActionCollection>
+#include <ActionCollection/ActionCollections>
 #include <KConfigGroup>
 #include <KIconTheme>
 #include <KLocalizedQmlContext>
@@ -57,7 +59,7 @@ bool writeJson(const QString &path, const QJsonObject &object)
     return file.open(QIODevice::WriteOnly | QIODevice::NewOnly) && file.write(QJsonDocument{object}.toJson()) > 0;
 }
 
-int persistentState(const QString &output, bool managed)
+int persistentState(const QString &output, bool managed, bool profile = false)
 {
     if (managed) {
         const auto path = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
@@ -75,8 +77,30 @@ int persistentState(const QString &output, bool managed)
         settings.resetTerminalDefaults();
     }
     const auto selected = presets.preset(presets.defaultPresetName());
+    QJsonObject migration;
+    if (profile) {
+        Kwi::TerminalPaletteModel palettes{&settings};
+        Kwi::AppShortcuts shortcuts;
+        auto *collection = KirigamiActions::ActionCollections::self()->collection(QStringLiteral("org.kde.kwi.tabs"));
+        auto *action = collection ? collection->action(QStringLiteral("new_tab")) : nullptr;
+        if (!action)
+            return 3;
+        const auto palette = palettes.schemeData(settings.colorScheme());
+        const KConfigGroup state{KSharedConfig::openStateConfig(QStringLiteral("kwistaterc")), QStringLiteral("MainWindow")};
+        migration = {{QStringLiteral("application"), QCoreApplication::applicationName()},
+                     {QStringLiteral("bidi"), settings.bidirectionalText()},
+                     {QStringLiteral("palette_foreground"), palette.value(QStringLiteral("foreground")).value<QColor>().name()},
+                     {QStringLiteral("new_tab_shortcut"), action->shortcut().toString(QKeySequence::PortableText)},
+                     {QStringLiteral("window_state"), QJsonObject::fromVariantMap([&] {
+                          QVariantMap entries;
+                          for (const auto &[key, value] : state.entryMap().asKeyValueRange())
+                              entries.insert(key, value);
+                          return entries;
+                      }())}};
+    }
     return writeJson(output,
-                     {{QStringLiteral("font"), settings.fontFamily()},
+                     {{QStringLiteral("migration"), migration},
+                      {QStringLiteral("font"), settings.fontFamily()},
                       {QStringLiteral("opacity"), settings.backgroundOpacity()},
                       {QStringLiteral("history"), settings.scrollbackLines()},
                       {QStringLiteral("immutable_history"), settings.isScrollbackLinesImmutable()},
@@ -605,18 +629,24 @@ private Q_SLOTS:
 
 int main(int argc, char **argv)
 {
-    const bool helper = argc == 3 && (!std::strcmp(argv[1], "--persisted") || !std::strcmp(argv[1], "--managed"));
+    const bool profile = argc == 3 && !std::strcmp(argv[1], "--profile-state");
+    const bool helper = profile || (argc == 3 && (!std::strcmp(argv[1], "--persisted") || !std::strcmp(argv[1], "--managed")));
     if (!helper)
         recordMacTestProcess();
-    QStandardPaths::setTestModeEnabled(true);
+    QStandardPaths::setTestModeEnabled(!profile);
     KIconTheme::initTheme();
     BreezeIcons::initIcons();
     QQuickWindow::setDefaultAlphaBuffer(true);
     QApplication app{argc, argv};
-    QCoreApplication::setApplicationName(QStringLiteral("kwi-macos-compatibility-test"));
+    QCoreApplication::setApplicationName(profile ? QStringLiteral("zirq") : QStringLiteral("kwi-macos-compatibility-test"));
+    if (profile) {
+        QCoreApplication::setOrganizationDomain(QStringLiteral("elashri.com"));
+        KConfig::setMainConfigName(QStringLiteral("kwirc"));
+        KirigamiAppDefaults::apply(qApp);
+    }
     KLocalizedString::setApplicationDomain("kwi");
     if (helper)
-        return persistentState(QString::fromLocal8Bit(argv[2]), !std::strcmp(argv[1], "--managed"));
+        return persistentState(QString::fromLocal8Bit(argv[2]), !std::strcmp(argv[1], "--managed"), profile);
     MacCompatibilityTest test;
     return QTest::qExec(&test, argc, argv);
 }

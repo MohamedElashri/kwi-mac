@@ -57,7 +57,7 @@ if(APPLE)
     set_tests_properties(macos-interaction PROPERTIES TIMEOUT 180 LABELS gui)
     add_executable(test-macos-compatibility MacCompatibilityTest.cpp MacGuiTestSupport.mm)
     set_target_properties(test-macos-compatibility PROPERTIES MACOSX_BUNDLE_GUI_IDENTIFIER "org.kde.kwi.tests.compatibility" MACOSX_BUNDLE_BUNDLE_NAME "Kwi Compatibility Tests")
-    target_link_libraries(test-macos-compatibility PRIVATE kwi-ui Qt6::Test Qt6::Widgets KirigamiApp KF6::BreezeIcons KF6::IconThemes KF6::CoreAddons KF6::Notifications KF6::I18nQml "-framework AppKit")
+    target_link_libraries(test-macos-compatibility PRIVATE kwi-ui Qt6::Test Qt6::Widgets KirigamiApp KF6::KirigamiActionCollection KF6::BreezeIcons KF6::IconThemes KF6::CoreAddons KF6::Notifications KF6::I18nQml "-framework AppKit")
     add_custom_command(TARGET test-macos-compatibility POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/libs/kwi-terminal/data/color-schemes" "$<TARGET_BUNDLE_CONTENT_DIR:test-macos-compatibility>/Resources/kwi/color-schemes/stock"
         COMMAND "${CMAKE_COMMAND}" -E copy_directory "${KDE_INSTALL_FULL_DATADIR}/kf6/searchproviders" "$<TARGET_BUNDLE_CONTENT_DIR:test-macos-compatibility>/Resources/kf6/searchproviders"

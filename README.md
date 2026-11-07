@@ -68,6 +68,11 @@ so your existing profile carries over. The installer recognizes `Kwi.app` and
 replaces it with `Zirq.app`, with rollback if replacement fails. Homebrew tracks
 the `kwi-mac` → `zirq` cask rename through this tap.
 
+Quit Kwi before upgrading. Preferences carry over; running tabs, processes and
+terminal scrollback do not resume after quitting. Shell history remains managed
+by your shell. Permissions associated with the old macOS app identity are
+outside this profile migration.
+
 The repository and download URLs remain at `MohamedElashri/kwi-mac`.
 
 ## Use

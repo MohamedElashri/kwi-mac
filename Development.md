@@ -37,7 +37,18 @@ a new build.
 
 To test installation in a separate directory, use
 `make install-release ARGS='--app-dir /path/to/Applications'`.
-Install, update and rollback tests run in `make check`.
+Install, update and rollback tests run in `make check`. After producing release
+assets, test the actual published Kwi 0.2.0 archive against the new ZIP:
+
+```sh
+gh release download v0.2.0 --pattern Kwi-arm64.zip --pattern SHA256SUMS --dir build-macos/upgrade-v0.2.0
+python3 scripts/macos/upgrade.py --previous build-macos/upgrade-v0.2.0 --assets build-macos/release-assets --probe build-macos/craft-root/build/kwi/kwi/work/build/bin/test-macos-compatibility.app/Contents/MacOS/test-macos-compatibility --tag v0.3.0 --output build-macos/results/upgrade-v0.3.0
+```
+
+The output directory must be new. This launches both genuine bundles with an
+isolated home, substitutes only the installer's download transport, and verifies
+profile preservation, presets, fonts, palettes, shortcuts, bidi preference and
+window state. It never installs into the user's Applications directory.
 
 ## Releases
 

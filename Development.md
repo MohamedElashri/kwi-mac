@@ -78,7 +78,11 @@ Mac integration and RTL features are maintained in this fork:
 
 Keep the VT grid, PTY input, copying and search in logical order. Rendering and
 pointer coordinates share visual cell maps. Make records the Ghostty patch hash
-and rebuilds the dependency when it changes.
+and source manifest and rebuilds the dependency when either changes.
+
+The Mac build pins the standalone libghostty-vt 1.0.0 release and its offline
+dependency archive in `craft/ghostty-sources.json`. Keep the Craft recipe and
+`craft/release-sources.json` in sync when updating it.
 
 `make upstream` and the [weekly workflow](.github/workflows/upstream.yml) report KDE
 changes; review updates on an integration branch. Prefer tagged KDE releases as

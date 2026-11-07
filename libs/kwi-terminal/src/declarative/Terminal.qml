@@ -7,14 +7,63 @@ import org.kde.kirigami as Kirigami
 import org.kde.ki18n
 import org.kde.kwi.terminal
 
+/*!
+    \qmltype Terminal
+    \inqmlmodule org.kde.kwi.terminal
+    \inherits FocusScope
+    \brief A terminal view with a scrollbar and visual feedback.
+
+    Set \l session to a \l Session to display its contents. The session must be
+    started explicitly. Configure fonts, colors and input behavior through \l view.
+
+    Terminal provides an always-visible scrollbar, a visual bell and a keyboard
+    selection cursor. It forwards context menu, link activation and paste
+    confirmation requests to the embedding application.
+*/
 FocusScope {
     id: root
 
+    /*!
+        \qmlproperty Session Terminal::session
+        Alias for \l {TerminalView::session}{view.session}.
+    */
     property alias session: terminal.session
+    /*!
+        \qmlproperty TerminalView Terminal::view
+        \readonly
+        The contained terminal view. Use it to configure appearance and input
+        behavior, and to invoke terminal actions such as \l {TerminalView::copy()}{copy},
+        \l {TerminalView::paste()}{paste} and \l {TerminalView::find()}{search}.
+    */
     readonly property alias view: terminal
 
+    /*!
+        \qmlmethod size Terminal::sizeForGrid(int columns, int rows)
+        Returns the size from \l {TerminalView::sizeForGrid()}{view.sizeForGrid()}
+        for \a columns and \a rows, with the scrollbar width added.
+    */
+    function sizeForGrid(columns: int, rows: int): size {
+        const viewSize = terminal.sizeForGrid(columns, rows);
+        return viewSize.width < 0 ? viewSize : Qt.size(viewSize.width + scrollbar.implicitWidth, viewSize.height);
+    }
+
+    /*!
+        \qmlsignal Terminal::multilinePasteRequested(Session origin, string text)
+        Forwards \l {TerminalView::multilinePasteRequested()}{view.multilinePasteRequested()}
+        with \a origin and \a text unchanged.
+    */
     signal multilinePasteRequested(Session origin, string text)
+    /*!
+        \qmlsignal Terminal::contextMenuRequested(point position)
+        Forwards \l {TerminalView::contextMenuRequested()}{view.contextMenuRequested()}
+        with \a position in \l view coordinates.
+    */
     signal contextMenuRequested(point position)
+    /*!
+        \qmlsignal Terminal::linkActivated(url url)
+        Forwards \l {TerminalView::linkActivated()}{view.linkActivated()}
+        with \a url unchanged.
+    */
     signal linkActivated(url url)
 
     KI18nContext {

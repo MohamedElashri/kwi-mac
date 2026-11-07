@@ -90,6 +90,51 @@ private Q_SLOTS:
         QVERIFY(bidi.visualFrame(selected).rows[0][bidi.visualCell({0, 0}).x()].flags & Selected);
     }
 
+    void batchedDirectionControls_data()
+    {
+        QTest::addColumn<QString>("text");
+        QTest::newRow("ascii-prefix") << QStringLiteral("\u2067ASCII text 123\u2069");
+        QTest::newRow("wide-prefix") << QStringLiteral("\u2067中文 😀 ASCII\u2069");
+        QTest::newRow("space-prefix") << QStringLiteral("\u200f  hello");
+        QTest::newRow("mixed") << QStringLiteral("abc \u2067العربية 123\u2069 end");
+    }
+
+    void batchedDirectionControls()
+    {
+        QFETCH(QString, text);
+        Terminal terminal;
+        QVERIFY(terminal.resize(80, 4));
+        // A single write takes the batched ASCII/Unicode printing paths.
+        QVERIFY(terminal.feed(text.toUtf8()));
+        Frame frame;
+        QVERIFY(terminal.snapshot(frame));
+        QCOMPARE(rowText(frame.rows[0]), text);
+        QCOMPARE(terminal.historyText(), text);
+        QVERIFY(terminal.select({0, 0}, {79, 0}));
+        QCOMPARE(terminal.selectionText(), text);
+        QVERIFY(terminal.resize(7, 8));
+        QCOMPARE(terminal.historyText(), text);
+    }
+
+    void wideWrapSpacersDoNotAddLogicalText()
+    {
+        Terminal terminal;
+        QVERIFY(terminal.resize(5, 2));
+        const QString text = QStringLiteral("שלום界");
+        QVERIFY(terminal.feed(text.toUtf8()));
+        Frame frame;
+        QVERIFY(terminal.snapshot(frame));
+        QCOMPARE(frame.rows[0].last().width, quint8(0));
+        QCOMPARE(terminal.historyText(), text);
+        BidiLayout bidi;
+        bidi.update(frame);
+        QVERIFY(!bidi.rows()[0].logicalCells.isEmpty());
+        QCOMPARE(rowText(bidi.visualFrame(frame).rows[0]), QStringLiteral("םולש"));
+        for (int y = 0; y < frame.rows.size(); ++y)
+            for (int x = 0; x < frame.columns; ++x)
+                QCOMPARE(bidi.logicalCell(bidi.visualCell({x, y})), QPoint(x, y));
+    }
+
     void fallbackGlyphsKeepLogicalColumns()
     {
         Terminal terminal;

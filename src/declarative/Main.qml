@@ -10,7 +10,6 @@ import QtQuick.Controls as Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs as Dialogs
 import org.kde.ki18n
-import org.kde.config as KConfig
 import org.kde.notification as KNotification
 import org.kde.kirigami as Kirigami
 import org.kde.kirigami.dialogs as KirigamiDialogs
@@ -36,7 +35,7 @@ Kirigami.ApplicationWindow {
     height: 650
     minimumWidth: 480
     minimumHeight: 320
-    visible: true
+    visible: false
 
     // Keep the surface alpha-capable for runtime opacity changes.
     color: "transparent"
@@ -177,8 +176,10 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    KConfig.WindowStateSaver {
-        configGroupName: "MainWindow"
+    function initialWindowSize(): size {
+        terminalToolBar.contentItem.ensurePolished();
+        const terminalSize = terminalPane.sizeForGrid(root.appSettings.windowColumns, root.appSettings.windowRows);
+        return Qt.size(terminalSize.width, terminalSize.height + terminalToolBar.implicitHeight);
     }
 
     function focusTerminal(): void {
@@ -222,10 +223,6 @@ Kirigami.ApplicationWindow {
         function onCurrentIndexChanged(): void {
             if (pasteDialog.visible && pasteDialog.targetSession !== root.sessionModel.currentSession) {
                 pasteDialog.reject();
-            }
-
-            if (root.findVisible && findBar.text.length > 0) {
-                root.search(true);
             }
         }
 
@@ -708,7 +705,7 @@ Kirigami.ApplicationWindow {
 
             AC.ActionCollection.collection: root.appShortcuts.collectionFor("tab_" + (index + 1))
             AC.ActionCollection.action: "tab_" + (index + 1)
-            enabled: root.terminalActionsEnabled && index < root.sessionModel.count
+            enabled: root.terminalActionsEnabled && root.sessionModel.count > 1 && index < root.sessionModel.count
 
             onTriggered: {
                 root.sessionModel.currentIndex = index;
@@ -1247,6 +1244,11 @@ Kirigami.ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     applicationSession: root.sessionModel.currentSession
+
+                    // Don't let the window's Kirigami.PageRow shortcuts interfere with the terminal.
+                    Keys.onShortcutOverride: event => {
+                        event.accepted = event.matches(StandardKey.Back) || event.matches(StandardKey.Forward);
+                    }
 
                     onMultilinePasteRequested: (origin, text) => {
                         pasteDialog.targetSession = origin;

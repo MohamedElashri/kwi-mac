@@ -37,6 +37,17 @@ private Q_SLOTS:
 #endif
     }
 
+    void synthesizedFunctionKeys()
+    {
+        GhosttyQt::Terminal terminal;
+        QKeyEvent up{QEvent::KeyPress, Qt::Key_Up, Qt::NoModifier};
+        QCOMPARE(terminal.encodeKey(up), QByteArray("\033[A"));
+        QKeyEvent backtab{QEvent::KeyPress, Qt::Key_Backtab, Qt::NoModifier, QStringLiteral("\t")};
+        QCOMPARE(terminal.encodeKey(backtab), QByteArray("\033[Z"));
+        QKeyEvent function{QEvent::KeyPress, Qt::Key_F5, Qt::NoModifier};
+        QCOMPARE(terminal.encodeKey(function), QByteArray("\033[15~"));
+    }
+
     void controlAndCommand()
     {
         using namespace GhosttyQt;

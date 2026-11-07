@@ -35,13 +35,32 @@ class BuildToolsTest(unittest.TestCase):
             record = prefix / "share/kwi/ghostty-build-inputs.json"
             record.parent.mkdir(parents=True)
             expected = [{"path": str(patch.relative_to(root)), "sha256": hashlib.sha256(patch.read_bytes()).hexdigest()}]
-            record.write_text(json.dumps({"patches": expected}))
+            sources = root / "craft/ghostty-sources.json"
+            sources.write_text('{"ghostty_version":"old"}')
+            record.write_text(json.dumps({"patches": expected, "sources": json.loads(sources.read_text())}))
             with mock.patch.object(craft, "ROOT", root), mock.patch.object(craft, "run") as run:
                 craft.refresh_vt_patches(prefix, {})
                 run.assert_not_called()
                 patch.write_text("changed revision")
                 craft.refresh_vt_patches(prefix, {})
                 self.assertIn("--unpack", run.call_args.args[0])
+                self.assertEqual(run.call_args.args[0][-1], "kwi/libghostty-vt")
+
+    def test_cached_vt_rebuilds_when_source_release_changes(self):
+        craft = load("craft")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sources = root / "craft/ghostty-sources.json"
+            sources.parent.mkdir()
+            sources.write_text('{"ghostty_version":"1.0.0"}')
+            prefix = root / "prefix"
+            record = prefix / "share/kwi/ghostty-build-inputs.json"
+            record.parent.mkdir(parents=True)
+            record.write_text(json.dumps({"patches": [], "sources": {"ghostty_version": "1.4.0"}}))
+            with mock.patch.object(craft, "ROOT", root), mock.patch.object(craft, "run") as run:
+                craft.refresh_vt_patches(prefix, {})
+                self.assertIn("--unpack", run.call_args.args[0])
+                self.assertIn("--make", run.call_args.args[0])
                 self.assertEqual(run.call_args.args[0][-1], "kwi/libghostty-vt")
 
     def test_invalid_job_count_does_not_modify_a_prefix(self):

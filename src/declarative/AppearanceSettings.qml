@@ -17,6 +17,7 @@ SettingsPage {
 
     required property AppSettings appSettings
     required property ColorSchemeModel terminalPalettes
+    property bool showWindowSettings: true
 
     objectName: "appearanceSettings"
     title: KI18n.i18nc("@title:window", "Appearance")
@@ -234,6 +235,7 @@ SettingsPage {
                         from: 0
                         to: 100
                         stepSize: 1
+                        Kirigami.StyleHints.tickMarkStepSize: 10
                         value: Math.round(root.appSettings.backgroundOpacity * 100)
 
                         onMoved: {
@@ -243,7 +245,19 @@ SettingsPage {
                     }
 
                     Controls.Label {
+                        id: opacityLabel
+
+                        Layout.preferredWidth: Math.ceil(opacityLabelMetrics.advanceWidth)
                         text: KI18n.i18nc("@label", "%1%", Math.round(opacitySlider.value))
+                        horizontalAlignment: Text.AlignRight
+
+                        TextMetrics {
+                            id: opacityLabelMetrics
+
+                            font: opacityLabel.font
+                            renderType: opacityLabel.renderType
+                            text: KI18n.i18nc("@label", "%1%", 999)
+                        }
                     }
 
                     Controls.CheckBox {
@@ -292,6 +306,62 @@ SettingsPage {
 
                     onToggled: {
                         root.appSettings.showTabStatusIcons = checked;
+                        root.appSettings.save();
+                    }
+                }
+            }
+        }
+
+        Forms.FormGroup {
+            title: KI18n.i18nc("@title:group", "Window")
+            visible: root.showWindowSettings
+
+            Forms.FormEntry {
+                contentItem: Controls.CheckBox {
+                    objectName: "useCustomWindowSizeSetting"
+                    Layout.fillWidth: true
+                    text: KI18n.i18nc("@option:check", "Use custom size for new windows")
+                    enabled: !root.appSettings.isUseCustomWindowSizeImmutable
+                    checked: root.appSettings.useCustomWindowSize
+
+                    onToggled: {
+                        root.appSettings.useCustomWindowSize = checked;
+                        root.appSettings.save();
+                    }
+                }
+            }
+
+            Forms.FormEntry {
+                title: KI18n.i18nc("@label:spinbox", "Columns:")
+                enabled: root.appSettings.useCustomWindowSize && !root.appSettings.isWindowColumnsImmutable
+
+                contentItem: Controls.SpinBox {
+                    objectName: "windowColumnsSetting"
+                    editable: true
+                    from: 2
+                    to: 999
+                    value: root.appSettings.windowColumns
+
+                    onValueModified: {
+                        root.appSettings.windowColumns = value;
+                        root.appSettings.save();
+                    }
+                }
+            }
+
+            Forms.FormEntry {
+                title: KI18n.i18nc("@label:spinbox", "Rows:")
+                enabled: root.appSettings.useCustomWindowSize && !root.appSettings.isWindowRowsImmutable
+
+                contentItem: Controls.SpinBox {
+                    objectName: "windowRowsSetting"
+                    editable: true
+                    from: 1
+                    to: 999
+                    value: root.appSettings.windowRows
+
+                    onValueModified: {
+                        root.appSettings.windowRows = value;
                         root.appSettings.save();
                     }
                 }

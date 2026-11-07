@@ -17,6 +17,7 @@
 #include <KLocalizedQmlContext>
 #include <KLocalizedString>
 #include <KWindowEffects>
+#include <KWindowStateSaver>
 #include <KWindowSystem>
 #include <QAccessible>
 #include <QCoreApplication>
@@ -32,9 +33,12 @@
 #include <QQuickWindow>
 #include <QSGRendererInterface>
 #include <QScreen>
+#include <QSize>
+#include <QSizeF>
 #include <QTimer>
 #include <QUuid>
 #include <QVariant>
+#include <QtMath>
 #include <algorithm>
 #include <utility>
 #ifdef Q_OS_MACOS
@@ -450,6 +454,10 @@ WindowManager::WindowContext *WindowManager::createWindow()
         requestQuit(context, force);
     });
 
+    connect(context->sessions, &SessionModel::closeConfirmationRequested, context->window, [this, context] {
+        activate(context);
+    });
+
     connect(context->sessions, &SessionModel::closeRequestCancelled, this, [this, context] {
         cancelQuit(context->sessions);
     });
@@ -467,6 +475,40 @@ WindowManager::WindowContext *WindowManager::createWindow()
     m_windows.append(context);
 
     return context;
+}
+
+void WindowManager::initializeWindow(WindowContext *context)
+{
+    if (!m_settings->useCustomWindowSize()) {
+        new KWindowStateSaver{context->window, QStringLiteral("MainWindow")};
+
+        return;
+    }
+
+    const auto resizeToGrid = [context] {
+        if (context->window->windowState() != Qt::WindowNoState) {
+            return;
+        }
+
+        QSizeF requested;
+        QMetaObject::invokeMethod(context->window, "initialWindowSize", Q_RETURN_ARG(QSizeF, requested));
+        const QSize size{qCeil(requested.width()), qCeil(requested.height())};
+        context->window->resize(size.expandedTo(context->window->minimumSize()).boundedTo(context->window->screen()->availableGeometry().size()));
+    };
+    resizeToGrid();
+
+    // We get the initial surface scale inbetween show() and delivering the
+    // first frame, so we need to derive the initial grid size at that time
+    // to take scaling into account.
+    const auto scaleConnection = connect(context->window, &QQuickWindow::devicePixelRatioChanged, context, resizeToGrid);
+    connect(
+        context->window,
+        &QQuickWindow::afterAnimating,
+        context,
+        [scaleConnection] {
+            disconnect(scaleConnection);
+        },
+        Qt::SingleShotConnection);
 }
 
 void WindowManager::updateProgress()
@@ -631,7 +673,9 @@ QQuickWindow *WindowManager::launch(const LaunchOptions &options)
         }
     }
 
-    if (!context) {
+    const bool newWindow{!context};
+
+    if (newWindow) {
         context = createWindow();
     }
 
@@ -658,6 +702,10 @@ QQuickWindow *WindowManager::launch(const LaunchOptions &options)
         return nullptr;
     }
 
+    if (newWindow) {
+        initializeWindow(context);
+    }
+
     activate(context, options.fullscreen);
 
     return context->window;
@@ -678,6 +726,7 @@ void WindowManager::detach(WindowContext *source, TerminalSession *session)
     }
 
     destination->sessions->adoptSession(source->sessions->takeSession(index));
+    initializeWindow(destination);
     activate(destination);
 }
 }

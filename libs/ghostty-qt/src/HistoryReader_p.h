@@ -32,7 +32,7 @@ public:
 
     bool initialize();
     void drain(QByteArray &output);
-    [[nodiscard]] bool formatRow(const GhosttyGridRef &reference);
+    [[nodiscard]] bool formatRow(GhosttyGridRef reference);
     [[nodiscard]] bool drained() const;
 };
 }

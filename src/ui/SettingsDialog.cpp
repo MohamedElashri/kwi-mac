@@ -57,11 +57,12 @@ SettingsDialog::SettingsDialog(QWidget *parent, TerminalSettings *settings, Term
     };
 
     const QVariantMap settingsProperties{{QStringLiteral("appSettings"), QVariant::fromValue(m_settings)}};
-    m_preferencesPage =
-        addForm(QStringLiteral("AppearanceSettings"),
-                i18nc("@title", "Appearance"),
-                QStringLiteral("preferences-desktop-theme-global"),
-                {{QStringLiteral("appSettings"), QVariant::fromValue(m_settings)}, {QStringLiteral("terminalPalettes"), QVariant::fromValue(m_palettes)}});
+    m_preferencesPage = addForm(QStringLiteral("AppearanceSettings"),
+                                i18nc("@title", "Appearance"),
+                                QStringLiteral("preferences-desktop-theme-global"),
+                                {{QStringLiteral("appSettings"), QVariant::fromValue(m_settings)},
+                                 {QStringLiteral("terminalPalettes"), QVariant::fromValue(m_palettes)},
+                                 {QStringLiteral("showWindowSettings"), false}});
     addForm(QStringLiteral("BehaviorSettings"), i18nc("@title", "Behavior"), QStringLiteral("preferences-system"), settingsProperties);
     addForm(QStringLiteral("TerminalSettings"), i18nc("@title", "Terminal"), QStringLiteral("utilities-terminal"), settingsProperties);
     m_presetsPage = addForm(QStringLiteral("PresetsSettings"),

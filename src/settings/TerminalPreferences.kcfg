@@ -32,6 +32,19 @@
         <entry name="showTabStatusIcons" key="ShowTabStatusIcons" type="Bool">
             <default>true</default>
         </entry>
+        <entry name="useCustomWindowSize" key="UseCustomWindowSize" type="Bool">
+            <default>false</default>
+        </entry>
+        <entry name="windowColumns" key="WindowColumns" type="Int">
+            <default>110</default>
+            <min>2</min>
+            <max>999</max>
+        </entry>
+        <entry name="windowRows" key="WindowRows" type="Int">
+            <default>28</default>
+            <min>1</min>
+            <max>999</max>
+        </entry>
     </group>
     <group name="Terminal">
         <entry name="bidirectionalText" key="BidirectionalText" type="Bool">

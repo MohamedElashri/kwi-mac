@@ -24,6 +24,11 @@
   <url type="homepage">https://invent.kde.org/utilities/kwi</url>
   <url type="vcs-browser">https://invent.kde.org/utilities/kwi</url>
   <launchable type="desktop-id">@KWI_APP_ID@.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://cdn.kde.org/screenshots/kwi/kwi.png</image>
+    </screenshot>
+  </screenshots>
   <provides><binary>@KWI_EXECUTABLE@</binary></provides>
   <translation type="gettext">@KWI_EXECUTABLE@</translation>
   <content_rating type="oars-1.1"/>

@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Eike Hein <hein@kde.org>
+# SPDX-License-Identifier: BSD-2-Clause
+
+include($KDE_DOCS/global/qt-module-defaults.qdocconf)
+
+project = KwiTerminal
+description = Kwi Terminal QML API
+version = $QT_VERSION
+documentationinheaders = true
+
+headers = Session.h SessionTitleFormatter.h TerminalView.h
+sourcedirs =
+sources = declarative/Terminal.qml kwi-terminal.qdoc hello-world.qdoc
+depends = kde qtcore qtqml qtquick
+
+navigation.landingpage = "Kwi Terminal QML Types"
+
+qhp.projects = KwiTerminal
+qhp.KwiTerminal.file = kwi-terminal.qhp
+qhp.KwiTerminal.namespace = org.kde.kwi.terminal.$QT_VERSION_TAG
+qhp.KwiTerminal.virtualFolder = kwi-terminal
+qhp.KwiTerminal.indexTitle = Kwi Terminal QML Types
+qhp.KwiTerminal.subprojects = types
+qhp.KwiTerminal.subprojects.types.title = QML Types
+qhp.KwiTerminal.subprojects.types.indexTitle = Kwi Terminal QML Types
+qhp.KwiTerminal.subprojects.types.selectors = qmlmodule:org.kde.kwi.terminal
+qhp.KwiTerminal.subprojects.types.sortPages = true

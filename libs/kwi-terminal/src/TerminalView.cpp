@@ -266,6 +266,10 @@ TerminalView::TerminalView(QQuickItem *parent)
 
 TerminalView::~TerminalView()
 {
+    // QQuickItem can emit these signals after our members are destroyed.
+    disconnect(this, &QQuickItem::visibleChanged, this, &TerminalView::resetCursorBlink);
+    disconnect(this, &QQuickItem::activeFocusChanged, this, &TerminalView::updateAccessibility);
+
     if (m_session) {
         if (m_session->terminal())
             m_session->terminal()->cancelSelectionGesture();
@@ -417,7 +421,6 @@ void TerminalView::changeSession(Session *newSession)
 
         reloadColors();
         updateMetrics();
-        refresh();
     } else {
         update();
     }
@@ -648,6 +651,9 @@ void TerminalView::updatePolish()
     const bool cursorWasVisible{m_frame.cursorVisible};
     const QRectF previousSelectionCursor{m_keyboardSelectionMode ? selectionCursorRectangle() : QRectF()};
 
+    // Change width and height together, even if Qt updates them one by one.
+    resizeTerminal();
+
     const auto started{traceVerbose() ? traceTime() : 0};
     const bool captured{m_session && m_session->snapshot(m_frame)};
     if (traceEnabled() && captured) {
@@ -737,7 +743,18 @@ void TerminalView::updateMetrics()
     const auto metrics = GhosttyQt::Quick::fontMetrics(m_font, dpr, dpi);
     m_cellWidth = metrics.cellSize.width();
     m_cellHeight = metrics.cellSize.height();
-    resizeTerminal();
+
+    refresh();
+    update();
+}
+
+QSizeF TerminalView::sizeForGrid(int columns, int rows) const
+{
+    if (columns < 2 || rows < 1) {
+        return {};
+    }
+
+    return {columns * m_cellWidth + 2 * m_padding, rows * m_cellHeight + 2 * m_padding};
 }
 
 void TerminalView::resizeTerminal()
@@ -749,9 +766,6 @@ void TerminalView::resizeTerminal()
                           int((height() - 2 * m_padding) / m_cellHeight),
                           QSize(qRound(m_cellWidth * dpr), qRound(m_cellHeight * dpr)));
     }
-
-    refresh();
-    update();
 }
 
 void TerminalView::geometryChange(const QRectF &next, const QRectF &previous)
@@ -759,7 +773,7 @@ void TerminalView::geometryChange(const QRectF &next, const QRectF &previous)
     QQuickItem::geometryChange(next, previous);
 
     if (next.size() != previous.size()) {
-        updateMetrics();
+        refresh();
     }
 }
 
@@ -2121,7 +2135,16 @@ void TerminalView::hoverMoveEvent(QHoverEvent *event)
 
     if (m_session && m_session->terminal() && !m_session->isReadOnly() && !event->modifiers().testFlag(Qt::ShiftModifier)
         && m_session->terminal()->mouseTracking()) {
-        sendMouse({.action = GhosttyQt::MouseEvent::Action::Move, .modifiers = event->modifiers(), .position = event->position()});
+        // Don't send mouse motion updates on frame changes when the pointer pos didn't
+        // change. Sending updates would not be wrong per-se, but other terminals tend
+        // to not do this, and it confuses some clients who can't handle complex mixed
+        // keyboard and motion input.
+        const auto &point = event->point(0);
+
+        if (point.globalPosition() != point.globalLastPosition()) {
+            sendMouse({.action = GhosttyQt::MouseEvent::Action::Move, .modifiers = event->modifiers(), .position = event->position()});
+        }
+
         event->accept();
     } else {
         event->ignore();

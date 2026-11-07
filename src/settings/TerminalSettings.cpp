@@ -80,25 +80,17 @@ TerminalSettings::TerminalSettings(QObject *parent)
     qGuiApp->installEventFilter(this);
     connect(qGuiApp, &QGuiApplication::fontDatabaseChanged, this, &TerminalSettings::refreshFixedWidthFonts);
 
-    const auto changeSignals = {&TerminalPreferences::useSystemFontChanged,
-                                &TerminalPreferences::fontFamilyChanged,
-                                &TerminalPreferences::fontPointSizeChanged,
-                                &TerminalPreferences::colorSchemeChanged,
-                                &TerminalPreferences::backgroundOpacityChanged,
-                                &TerminalPreferences::backgroundBlurChanged,
-                                &TerminalPreferences::tabBarAtBottomChanged,
-                                &TerminalPreferences::showTabStatusIconsChanged,
-                                &TerminalPreferences::scrollbackLinesChanged,
-                                &TerminalPreferences::silenceSecondsChanged,
-                                &TerminalPreferences::titleFormatChanged,
-                                &TerminalPreferences::remoteTitleFormatChanged,
-                                &TerminalPreferences::windowTitleFromApplicationChanged,
-                                &TerminalPreferences::cursorStyleChanged,
-                                &TerminalPreferences::cursorBlinkingChanged,
-                                &TerminalPreferences::confirmCloseRunningChanged,
-                                &TerminalPreferences::confirmMultilinePasteChanged,
-                                &TerminalPreferences::copyOnSelectChanged,
-                                &TerminalPreferences::optionAsAltChanged,
+    const auto changeSignals = {&TerminalPreferences::useSystemFontChanged,       &TerminalPreferences::fontFamilyChanged,
+                                &TerminalPreferences::fontPointSizeChanged,       &TerminalPreferences::colorSchemeChanged,
+                                &TerminalPreferences::backgroundOpacityChanged,   &TerminalPreferences::backgroundBlurChanged,
+                                &TerminalPreferences::tabBarAtBottomChanged,      &TerminalPreferences::showTabStatusIconsChanged,
+                                &TerminalPreferences::useCustomWindowSizeChanged, &TerminalPreferences::windowColumnsChanged,
+                                &TerminalPreferences::windowRowsChanged,          &TerminalPreferences::scrollbackLinesChanged,
+                                &TerminalPreferences::silenceSecondsChanged,      &TerminalPreferences::titleFormatChanged,
+                                &TerminalPreferences::remoteTitleFormatChanged,   &TerminalPreferences::windowTitleFromApplicationChanged,
+                                &TerminalPreferences::cursorStyleChanged,         &TerminalPreferences::cursorBlinkingChanged,
+                                &TerminalPreferences::confirmCloseRunningChanged, &TerminalPreferences::confirmMultilinePasteChanged,
+                                &TerminalPreferences::copyOnSelectChanged,        &TerminalPreferences::optionAsAltChanged,
                                 &TerminalPreferences::requireCtrlForLinksChanged};
 
     for (const auto signal : changeSignals) {

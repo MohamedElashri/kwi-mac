@@ -23,15 +23,16 @@
      self.tabstops.deinit(alloc);
      self.screens.deinit(alloc);
      self.colors.palette.deinit(alloc);
-@@ -685,6 +694,7 @@
+@@ -741,6 +750,8 @@
+     grapheme_cluster: bool,
      allow_unicode: bool,
  ) !usize {
-     const screen: *Screen = self.screens.active;
 +    if (self.pending_bidi.items.len > 0) return 0;
- 
-     // Codepoints in [0x10, 0xFF] are always narrow (width 1, matching
-     // the c <= 0xFF fast path in print) and can never interact with
-@@ -1308,6 +1318,34 @@
++
+     // Printable ASCII is always narrow and eligible.
+     if (comptime Cp == u8) return self.printSliceFill(
+         .narrow,
+@@ -1923,6 +1934,34 @@
      else
          self.scrolling_region.right + 1;
  
@@ -66,23 +67,23 @@
      // Perform grapheme clustering if grapheme support is enabled (mode 2027).
      // This is MUCH slower than the normal path so the conditional below is
      // purposely ordered in least-likely to most-likely so we can drop out
-@@ -1585,6 +1623,7 @@
+@@ -2210,6 +2249,7 @@
              @branchHint(.likely);
-             self.screens.active.cursorMarkDirty();
+             // writeCell marks the row dirty.
              @call(.always_inline, printCell, .{ self, c, .narrow, charset });
 +            try self.applyBidiPrefix();
          },
  
          // Wide character requires a spacer. We print this by
-@@ -1619,6 +1658,7 @@
+@@ -2244,6 +2284,7 @@
+             }
  
-             self.screens.active.cursorMarkDirty();
              self.printCell(c, .wide, charset);
 +            try self.applyBidiPrefix();
              self.screens.active.cursorRight(1);
              self.writeCell(0, .spacer_tail);
          } else {
-@@ -1640,6 +1680,22 @@
+@@ -2264,6 +2305,22 @@
  
      // Move the cursor
      self.screens.active.cursorRight(1);
@@ -105,7 +106,7 @@
  }
  
  /// Prints the character unmapped_c into the cell under the cursor, mapped
-@@ -5105,6 +5161,7 @@
+@@ -5866,6 +5923,7 @@
  /// this will reuse the existing memory. In the latter case, memory may
  /// be wasted (since its unused) but it isn't leaked.
  pub fn fullReset(self: *Terminal) void {
@@ -113,7 +114,7 @@
      // Ensure we're back on primary screen
      self.screens.switchTo(.primary);
  
-@@ -5155,6 +5212,7 @@
+@@ -5916,6 +5974,7 @@
  /// reset does: left and right margins, the cursor style, the color palette,
  /// modifyOtherKeys, and the XTCHECKSUM variant.
  pub fn softReset(self: *Terminal) void {
@@ -123,7 +124,7 @@
          .insert,
 --- a/src/terminal/formatter.zig
 +++ b/src/terminal/formatter.zig
-@@ -1440,7 +1440,7 @@
+@@ -1459,7 +1459,7 @@
                      // Trailing spaces are blank. We know it is trailing
                      // because if we get a non-empty cell later we'll
                      // fill the blanks.
@@ -132,7 +133,7 @@
                          blank_cells += 1;
                          continue;
                      }
-@@ -1808,7 +1808,7 @@
+@@ -1827,7 +1827,7 @@
                  }
  
                  // Trailing spaces are blank.
@@ -143,7 +144,7 @@
                  }
 --- a/src/terminal/Screen.zig
 +++ b/src/terminal/Screen.zig
-@@ -3326,7 +3326,7 @@
+@@ -3325,7 +3325,7 @@
                  whitespace,
                  cell.content.codepoint.data,
              ) != null;
@@ -152,7 +153,7 @@
  
              break :start p;
          }
-@@ -3348,7 +3348,7 @@
+@@ -3347,7 +3347,7 @@
                  whitespace,
                  cell.content.codepoint.data,
              ) != null;
@@ -161,7 +162,7 @@
  
              break :end p;
          }
-@@ -3380,7 +3380,7 @@
+@@ -3379,7 +3379,7 @@
                  whitespace,
                  &[_]u32{cell.content.codepoint.data},
              ) != null;
@@ -170,7 +171,7 @@
  
              break :start p;
          }
-@@ -3404,7 +3404,7 @@
+@@ -3403,7 +3403,7 @@
                  whitespace,
                  &[_]u32{cell.content.codepoint.data},
              ) != null;

@@ -1,0 +1,10 @@
+// SPDX-FileCopyrightText: 2026 Eike Hein <hein@kde.org>
+// SPDX-License-Identifier: CC-BY-SA-4.0
+
+/*!
+    \qmlmodule org.kde.kwi.terminal
+    \title Kwi Terminal QML Types
+    \brief Components for embedding a terminal in a Qt Quick application.
+
+    For a minimal terminal window, see \l {Hello World}.
+*/

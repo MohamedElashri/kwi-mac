@@ -59,6 +59,10 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--jobs", default="4")
     args = parser.parse_args()
+    # Zig mixes canonical cache paths with source-relative tool paths. Resolve
+    # macOS aliases such as /tmp -> /private/tmp before it computes those paths.
+    for name in ("source", "zig", "prefix", "cache"):
+        setattr(args, name, getattr(args, name).resolve())
     args.cache.mkdir(parents=True, exist_ok=True)
     manifest = json.loads((ROOT / "craft/ghostty-sources.json").read_text())
     for source in manifest["sources"]:
@@ -84,22 +88,27 @@ def main():
     env["PATH"] = str(Path(native_libtool).parent) + os.pathsep + env["PATH"]
     env["SDKROOT"] = sdk  # Ghostty's apple-sdk helper obtains absolute paths through xcrun.
     command = [str(args.zig), "build", "--system", str(args.source / "zig-packages"),
-               "-fno-sys=simdutf", "-fno-sys=highway", "-Demit-lib-vt", "-Demit-xcframework=false",
-               "-Demit-macos-app=false", "-Demit-themes=false", "-Demit-terminfo=false", "-Dapp-runtime=none",
-               "-Di18n=false", "-Doptimize=fast", "-Dcpu=baseline", "-Dtarget=aarch64-macos.14.4",
-               "-Dversion-string=1.4.0", "-Dlib-version-string=0.1.0-dev+83fb95624b0439ee660c2679b43b38c8b63769cd",
+               "-Demit-xcframework=false", "-Doptimize=ReleaseFast", "-Dcpu=baseline",
+               "-Dtarget=aarch64-macos.14.4",
                "--prefix", str(args.prefix), "-j" + args.jobs]
     print("Building pinned Ghostty with native arm64 Zig", flush=True)
     subprocess.run(command, cwd=args.source, env=env, check=True, timeout=3600)
     licenses = args.prefix / "share/licenses/libghostty-vt"
     licenses.mkdir(parents=True, exist_ok=True)
     for directory, name in [(args.source, "ghostty"), (args.zig.parent, "zig"),
-                            (args.source / "simdutf-licenses", "simdutf")]:
+                            (args.source / "pkg/simdutf/vendor", "simdutf"),
+                            (args.source / "uucode-licenses", "uucode")]:
         target = licenses / name
         target.mkdir(exist_ok=True)
         for path in directory.glob("LICENSE*"):
             if path.is_file():
                 shutil.copyfile(path, target / path.name)
+    shutil.copyfile(args.zig.parent / "lib/libc/musl/COPYRIGHT", licenses / "zig/musl-COPYRIGHT")
+    shutil.copyfile(args.source / "deps/libghostty-vt-third-party.json", licenses / "libghostty-vt-third-party.json")
+    simdutf = (args.source / "pkg/simdutf/vendor/simdutf.h").read_text()
+    notice_start = simdutf.index("/* From\n")
+    notice_end = simdutf.index("*/", notice_start) + 2
+    (licenses / "simdutf/ISA-DETECTION-NOTICE").write_text(simdutf[notice_start:notice_end] + "\n")
     for package in (args.source / "zig-packages").iterdir():
         for folder in (package, package / "licenses"):
             for path in folder.glob("LICENSE*"):

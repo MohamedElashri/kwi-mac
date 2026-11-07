@@ -34,14 +34,17 @@ set(kwi_qml_files
     declarative/TerminalTabButton.qml declarative/SettingsPage.qml declarative/AppearanceSettings.qml
     declarative/ColorSchemeEditor.qml declarative/TerminalSettings.qml declarative/BehaviorSettings.qml
     declarative/KeyboardSettings.qml declarative/TerminalPane.qml declarative/TerminalSearchBar.qml
+    declarative/TerminalSearchField.qml
     declarative/PresetsSettings.qml declarative/PromptDialogFooter.qml
     declarative/WebShortcutMenu.qml declarative/TabCloseButton.qml declarative/KwiAboutPage.qml
     declarative/+org.kde.desktop/TabCloseButton.qml
-    declarative/+org.kde.union/TabCloseButton.qml)
+    declarative/+org.kde.union/TabCloseButton.qml
+    declarative/+org.kde.union/TerminalSearchField.qml)
 
 set_source_files_properties(
     declarative/+org.kde.desktop/TabCloseButton.qml
     declarative/+org.kde.union/TabCloseButton.qml
+    declarative/+org.kde.union/TerminalSearchField.qml
     PROPERTIES QT_QML_SKIP_QMLDIR_ENTRY TRUE)
 
 if(BUILD_KPART)
@@ -96,7 +99,7 @@ if(APPLE)
     set_target_properties(kwi PROPERTIES MACOSX_BUNDLE_ICON_FILE "kwi.icns")
 endif()
 target_link_libraries(kwi PRIVATE kwi-ui Qt6::Widgets KirigamiApp KF6::CoreAddons
-    KF6::DBusAddons KF6::ConfigQml KF6::I18nQml KF6::Kirigami KF6::WindowSystem)
+    KF6::DBusAddons KF6::I18nQml KF6::Kirigami KF6::WindowSystem)
 target_include_directories(kwi PRIVATE "${PROJECT_BINARY_DIR}")
 
 if(BUILD_KPART)

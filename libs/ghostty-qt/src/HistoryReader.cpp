@@ -87,9 +87,9 @@ bool HistoryReader::Private::drained() const
     return outputLines == 0 && outputSpaces == 0 && outputText.isEmpty();
 }
 
-bool HistoryReader::Private::formatRow(const GhosttyGridRef &reference)
+bool HistoryReader::Private::formatRow(GhosttyGridRef reference)
 {
-    GhosttySelection selection{GHOSTTY_INIT_SIZED(GhosttySelection)};
+    GhosttySelection selection{};
     selection.start = reference;
     selection.end = reference;
     selection.end.x = columns - 1;
@@ -145,19 +145,16 @@ bool HistoryReader::Private::formatRow(const GhosttyGridRef &reference)
         pendingSpaces = 0;
     }
 
-    GhosttyFormatterTerminalOptions options{GHOSTTY_INIT_SIZED(GhosttyFormatterTerminalOptions)};
-    options.emit = GHOSTTY_FORMATTER_FORMAT_PLAIN;
-    options.trim = true;
-    options.selection = &selection;
     GhosttyFormatter formatter{nullptr};
 
-    if (ghostty_formatter_terminal_new(nullptr, &formatter, terminal, options) != GHOSTTY_SUCCESS) {
+    if (ghostty_formatter_terminal_new(nullptr, &formatter, terminal) != GHOSTTY_SUCCESS) {
         return false;
     }
 
     const auto cleanup = qScopeGuard([formatter] {
         ghostty_formatter_free(formatter);
     });
+    ghostty_formatter_set(formatter, GHOSTTY_FORMATTER_OPT_SELECTION, &selection);
     const auto result = ghostty_formatter_format(formatter, {append, &outputText});
 
     if (result != GHOSTTY_SUCCESS) {
@@ -204,8 +201,7 @@ std::expected<HistoryReader::Chunk, HistoryReader::Error> HistoryReader::read()
     const uint32_t count{std::min({rowsPerChunk, uint32_t(bytesPerChunk / columns), end.y - next.y + 1})};
     const uint32_t last{next.y + count - 1};
     std::array<GhosttyGridRef, rowsPerChunk> references{};
-    GhosttySelection cursor{GHOSTTY_INIT_SIZED(GhosttySelection)};
-    cursor.end = GHOSTTY_INIT_SIZED(GhosttyGridRef);
+    GhosttySelection cursor{};
 
     if (ghostty_terminal_grid_ref(d->terminal, point(0, last), &cursor.end) != GHOSTTY_SUCCESS) {
         return std::unexpected(Error::HistoryChanged);

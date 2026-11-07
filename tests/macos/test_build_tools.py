@@ -91,6 +91,27 @@ class BuildToolsTest(unittest.TestCase):
                 app_test_support.ensure_kwi_not_running(lock)
             self.assertTrue(lock.exists())
 
+    def test_trace_reader_accepts_zirq_and_historical_logs(self):
+        smoke = load("smoke")
+        self.assertEqual(smoke.records('Qt: ZIRQ_TRACE {"kind":"new"}\nQt: KWI_TRACE {"kind":"legacy"}'),
+                         [{"kind": "new"}, {"kind": "legacy"}])
+
+    def test_bundle_ownership_survives_the_rename_without_following_symlinks(self):
+        bundle = load("bundle")
+        with tempfile.TemporaryDirectory() as directory:
+            app = Path(directory) / "Zirq.app"
+            resources = app / "Contents/Resources"
+            resources.mkdir(parents=True)
+            legacy = resources / "kwi-bundle.json"
+            legacy.write_text(json.dumps({"owner": "kwi-macos-bundle"}))
+            self.assertTrue(bundle.owned_bundle(app))
+            current = resources / "zirq-bundle.json"
+            current.write_text(json.dumps({"owner": bundle.OWNER}))
+            self.assertTrue(bundle.owned_bundle(app))
+            current.unlink()
+            current.symlink_to(legacy)
+            self.assertFalse(bundle.owned_bundle(app))
+
     def test_output_completion_requires_matching_prepared_terminal(self):
         smoke = load("smoke")
         events = [

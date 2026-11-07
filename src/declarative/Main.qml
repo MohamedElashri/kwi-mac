@@ -94,7 +94,7 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    // Kwi provides its own configurable Quit action.
+    // Zirq provides its own configurable Quit action.
     quitAction.enabled: false
 
     title: root.currentSession ? (root.appSettings.windowTitleFromApplication ? root.currentSession.applicationTitle : root.currentSession.title) : ""
@@ -1792,7 +1792,7 @@ Kirigami.ApplicationWindow {
         objectName: "aboutDialog"
         title: KI18n.i18nc("@title:window", "About %1", Qt.application.displayName)
         pageFactory: () => Qt.platform.os === "osx"
-            ? Qt.createComponent("org.kde.kwi", "KwiAboutPage")
+            ? Qt.createComponent("org.kde.kwi", "ZirqAboutPage")
             : Qt.createComponent("org.kde.kirigamiaddons.formcard", "AboutPage")
         initialProperties: ({ objectName: "aboutPage", getInvolvedUrl: "", donateUrl: "" })
     }

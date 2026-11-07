@@ -3,7 +3,7 @@
 
 /*!
     \qmlmodule org.kde.kwi.terminal
-    \title Kwi Terminal QML Types
+    \title Zirq Terminal QML Types
     \brief Components for embedding a terminal in a Qt Quick application.
 
     For a minimal terminal window, see \l {Hello World}.

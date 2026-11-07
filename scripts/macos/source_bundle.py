@@ -140,7 +140,7 @@ def prepare(prefix, app, output):
                                                 for source in component["sources"]], "notice_files": notice_count})
     commit = bundle.run(["git", "-C", ROOT, "rev-parse", "HEAD"]).strip()
     project_source = output / ".application-source.tar.gz"
-    subprocess.run(["git", "-C", str(ROOT), "archive", "--format=tar.gz", "--prefix=kwi/", "--output", str(project_source), commit], check=True)
+    subprocess.run(["git", "-C", str(ROOT), "archive", "--format=tar.gz", "--prefix=zirq/", "--output", str(project_source), commit], check=True)
     recipe_archives = []
     for name, checkout, revision in [
         ("craft", prefix / "craft", catalog["craft_commit"]),

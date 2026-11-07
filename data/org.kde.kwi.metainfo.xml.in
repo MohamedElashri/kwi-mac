@@ -13,12 +13,12 @@
   <description>
     <p>Zirq is an independently maintained terminal for macOS, based on KDE Kwi, with Arabic, Persian and Hebrew support.</p>
   </description>
-  <url type="homepage">https://github.com/MohamedElashri/kwi-mac</url>
-  <url type="vcs-browser">https://github.com/MohamedElashri/kwi-mac</url>
+  <url type="homepage">https://github.com/MohamedElashri/zirq</url>
+  <url type="vcs-browser">https://github.com/MohamedElashri/zirq</url>
   <launchable type="desktop-id">@KWI_APP_ID@.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/MohamedElashri/kwi-mac/main/assets/readme/screenshot.png</image>
+      <image>https://raw.githubusercontent.com/MohamedElashri/zirq/main/assets/readme/screenshot.png</image>
     </screenshot>
   </screenshots>
   <provides><binary>@KWI_EXECUTABLE@</binary></provides>

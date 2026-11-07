@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 cmake_minimum_required(VERSION 3.28)
-project(kwi VERSION 0.3.0 LANGUAGES C CXX)
+project(zirq VERSION 0.3.0 LANGUAGES C CXX)
 
 if(APPLE)
     enable_language(OBJCXX)
@@ -37,7 +37,7 @@ if(APPLE)
 else()
     set(_kwi_kpart_default ON)
 endif()
-option(BUILD_KPART "Build the Kwi terminal KPart" ${_kwi_kpart_default})
+option(BUILD_KPART "Build the Zirq terminal KPart" ${_kwi_kpart_default})
 
 if(BUILD_TESTING)
     enable_testing()

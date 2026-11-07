@@ -55,7 +55,7 @@ print("KWI_COMPATIBILITY_CAPTURE", flush=True)
     env = {key: os.environ[key] for key in ("USER", "LOGNAME") if key in os.environ}
     env.update(HOME=str(home), CFFIXED_USER_HOME=str(home), PATH="/usr/bin:/bin:/usr/sbin:/sbin",
                DBUS_SESSION_BUS_ADDRESS="unix:path=" + str(output / "absent-bus.socket"),
-               KWI_TRACE="2", KWI_TRACE_MARKER="KWI_COMPATIBILITY_CAPTURE")
+               ZIRQ_TRACE="2", ZIRQ_TRACE_MARKER="KWI_COMPATIBILITY_CAPTURE")
     literal = ["space argument", "", "literal ; $HOME $(false)", "Unicode-é"]
     cases = []
     pending = []

@@ -31,7 +31,7 @@ elif name == "curl":
     with (fixture / "requests").open("a") as out:
         out.write(args[-1] + "\n")
     if "--write-out" in args:
-        print("https://github.com/MohamedElashri/kwi-mac/releases/tag/v0.2.0", end="")
+        print("https://github.com/MohamedElashri/zirq/releases/tag/v0.2.0", end="")
     else:
         source = fixture / ("SHA256SUMS" if args[-1].endswith("SHA256SUMS") else "release.zip")
         shutil.copyfile(source, args[args.index("--output") + 1])

@@ -1360,7 +1360,7 @@ int main(int argc, char **argv)
     QApplication app{argc, argv};
     KLocalizedString::setApplicationDomain("kwi");
     KAboutData::setApplicationData(Kwi::applicationAboutData());
-    QCoreApplication::setApplicationName(QStringLiteral("kwi-macos-interaction-test"));
+    QCoreApplication::setApplicationName(QStringLiteral("zirq-macos-interaction-test"));
     if (helper) {
         // A Kwi writer and Zirq reader must share customized shortcuts.
         QCoreApplication::setApplicationName(argc == 4 ? QStringLiteral("kwi") : QStringLiteral("zirq"));

@@ -12,8 +12,8 @@ import subprocess
 from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[2]
-REPOSITORY = "https://github.com/MohamedElashri/kwi-mac"
-REPO = "MohamedElashri/kwi-mac"
+REPOSITORY = "https://github.com/MohamedElashri/zirq"
+REPO = "MohamedElashri/zirq"
 CASK = "Casks/zirq.rb"
 
 

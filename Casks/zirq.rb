@@ -5,10 +5,10 @@ cask "zirq" do
   version "0.2.0"
   sha256 "825b700cb4447d726b13a3a37f7bf7bb5b0d14baf284d89b9161ef5c330cd958"
 
-  url "https://github.com/MohamedElashri/kwi-mac/releases/download/v#{version}/Kwi-arm64.zip"
+  url "https://github.com/MohamedElashri/zirq/releases/download/v#{version}/Kwi-arm64.zip"
   name "Zirq"
   desc "Terminal with bidirectional Arabic, Persian and Hebrew support"
-  homepage "https://github.com/MohamedElashri/kwi-mac"
+  homepage "https://github.com/MohamedElashri/zirq"
 
   livecheck do
     url :url

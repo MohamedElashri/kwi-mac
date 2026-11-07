@@ -47,7 +47,7 @@ Session::Session(QObject *parent)
 {
     connect(m_sshMetadata.get(), &SshMetadataResolver::changed, this, &Session::sshInfoChanged);
     if (traceEnabled()) {
-        const auto marker = QCoreApplication::instance()->property("kwiTraceMarker").toString().toUtf8();
+        const auto marker = QCoreApplication::instance()->property("zirqTraceMarker").toString().toUtf8();
         if (marker.size() <= 4096)
             m_traceMarker = marker;
     }
@@ -59,7 +59,7 @@ Session::Session(QObject *parent)
         m_state = State::Failed;
     } else {
         m_terminal->setTerminfoName("xterm-256color");
-        m_terminal->setApplicationIdentity(QByteArray("Kwi (libghostty " + GhosttyQt::Terminal::version().toUtf8() + ")"));
+        m_terminal->setApplicationIdentity(QByteArray("Zirq (libghostty " + GhosttyQt::Terminal::version().toUtf8() + ")"));
         m_terminal->setClipboardWriteHandler([](std::unique_ptr<QMimeData> contents, QClipboard::Mode mode) {
             auto *clipboard = QGuiApplication::clipboard();
 
@@ -700,9 +700,9 @@ void Session::feed(const QByteArray &bytes)
     if (m_terminal && !m_terminal->feed(bytes)) {
         reportError(i18nd("kwi-terminal", "The terminal could not process output."));
     }
-    if (!m_traceMarker.isEmpty() && !property("kwiTraceMarkerFed").toBool()) {
+    if (!m_traceMarker.isEmpty() && !property("zirqTraceMarkerFed").toBool()) {
         if (advanceTraceMarker(m_traceMarkerTail, m_traceMarker, bytes))
-            setProperty("kwiTraceMarkerFed", true);
+            setProperty("zirqTraceMarkerFed", true);
     }
     if (traceVerbose()) {
         trace(QStringLiteral("feed"),

@@ -36,7 +36,7 @@ set(kwi_qml_files
     declarative/KeyboardSettings.qml declarative/TerminalPane.qml declarative/TerminalSearchBar.qml
     declarative/TerminalSearchField.qml
     declarative/PresetsSettings.qml declarative/PromptDialogFooter.qml
-    declarative/WebShortcutMenu.qml declarative/TabCloseButton.qml declarative/KwiAboutPage.qml
+    declarative/WebShortcutMenu.qml declarative/TabCloseButton.qml declarative/ZirqAboutPage.qml
     declarative/+org.kde.desktop/TabCloseButton.qml
     declarative/+org.kde.union/TabCloseButton.qml
     declarative/+org.kde.union/TerminalSearchField.qml)
@@ -93,7 +93,7 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_NAME "${KWI_DISPLAY_NAME}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
-        MACOSX_BUNDLE_COPYRIGHT "2026 Kwi contributors")
+        MACOSX_BUNDLE_COPYRIGHT "2026 Mohamed Elashri and KDE Kwi contributors")
     include(ECMAddAppIcon)
     configure_file("${PROJECT_SOURCE_DIR}/logo.png" "1024-zirq.png" COPYONLY)
     ecm_add_app_icon(kwi OUTFILE_BASENAME zirq ICONS "${CMAKE_CURRENT_BINARY_DIR}/1024-zirq.png")

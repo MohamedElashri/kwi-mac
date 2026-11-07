@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- SPDX-FileCopyrightText: 2026 Mohamed Elashri <kwi@elashri.com> -->
+<!-- SPDX-FileCopyrightText: 2026 Mohamed Elashri -->
 <!-- SPDX-License-Identifier: CC0-1.0 -->
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
@@ -13,6 +13,6 @@
   <rect x="34" y="40" width="444" height="444" rx="108" fill="#000" opacity=".16"/>
   <rect x="34" y="28" width="444" height="444" rx="108" fill="url(#surface)"/>
   <rect x="35" y="29" width="442" height="442" rx="107" fill="none" stroke="#d8fff0" stroke-opacity=".18" stroke-width="2"/>
-  <path d="M148 150H364L338 186H148ZM314 180H364L198 332H148ZM148 326H298V362H148Z" fill="url(#ink)"/>
-  <path d="M326 326H364V362H326Z" fill="#74e6bd"/>
+  <path d="M145 148H367V188L213 326H294V366H145V326L299 188H145Z" fill="url(#ink)"/>
+  <path d="M329 326H367V366H329Z" fill="#74e6bd"/>
 </svg>

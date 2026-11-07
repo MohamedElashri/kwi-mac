@@ -3,16 +3,16 @@ SPDX-FileCopyrightText: 2026 Eike Hein <hein@kde.org>
 SPDX-FileCopyrightText: 2026 Mohamed Elashri <kwi@elashri.com>
 SPDX-License-Identifier: CC0-1.0
 -->
-# <img src="logo.svg" width="32" alt=""/> Zirq
+# <img src="logo.svg" width="64" alt=""/> Zirq
 
-[![CI](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/MohamedElashri/kwi-mac/actions/workflows/checks.yml)
-[![Latest release](https://img.shields.io/github/v/release/MohamedElashri/kwi-mac)](https://github.com/MohamedElashri/kwi-mac/releases/latest)
-[![Platform](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple&logoColor=white)](https://github.com/MohamedElashri/kwi-mac/releases/latest)
+[![CI](https://github.com/MohamedElashri/zirq/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/MohamedElashri/zirq/actions/workflows/checks.yml)
+[![Latest release](https://img.shields.io/github/v/release/MohamedElashri/zirq)](https://github.com/MohamedElashri/zirq/releases/latest)
+[![Platform](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple&logoColor=white)](https://github.com/MohamedElashri/zirq/releases/latest)
 [![License](https://img.shields.io/badge/license-GPL%20%2F%20LGPL-blue)](LICENSES/)
 
-A Metal-accelerated terminal for Apple Silicon. An independently maintained
-macOS fork of [KDE Kwi](https://invent.kde.org/utilities/kwi), with bidirectional
-Arabic, Persian and Hebrew support. Built with Qt Quick, KDE Frameworks and libghostty-vt.
+A Metal-accelerated terminal workspace for Apple Silicon, with bidirectional
+Arabic, Persian and Hebrew support. Zirq builds on [KDE Kwi](https://invent.kde.org/utilities/kwi),
+Qt Quick, KDE Frameworks and libghostty-vt, with its own macOS integration and features.
 
 ![Zirq with tabbed sessions, truecolor output and Unicode text](assets/readme/screenshot.png)
 
@@ -27,7 +27,7 @@ An Apple Silicon Mac is required; see the release notes for the minimum macOS ve
 Install or update the latest stable release:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/MohamedElashri/kwi-mac/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/MohamedElashri/zirq/main/install.sh | bash
 ```
 
 Run the same command again to update. The installer verifies checksums and
@@ -38,19 +38,19 @@ Quit Zirq and use another terminal when updating. For a custom destination, repl
 **Homebrew** uses this repository as its tap:
 
 ```sh
-brew tap MohamedElashri/kwi-mac https://github.com/MohamedElashri/kwi-mac.git
-brew install --cask mohamedelashri/kwi-mac/zirq
+brew tap MohamedElashri/zirq https://github.com/MohamedElashri/zirq.git
+brew install --cask mohamedelashri/zirq/zirq
 ```
 
 Update a Homebrew installation with:
 
 ```sh
 brew update
-brew upgrade --cask mohamedelashri/kwi-mac/zirq
+brew upgrade --cask mohamedelashri/zirq/zirq
 ```
 
 For manual installation, download the app archive from the
-[latest release](https://github.com/MohamedElashri/kwi-mac/releases/latest)
+[latest release](https://github.com/MohamedElashri/zirq/releases/latest)
 and move the included app to Applications. The first Zirq release uses
 **Zirq-arm64.zip**; version 0.2.0 still uses **Kwi-arm64.zip**.
 
@@ -73,7 +73,27 @@ terminal scrollback do not resume after quitting. Shell history remains managed
 by your shell. Permissions associated with the old macOS app identity are
 outside this profile migration.
 
-The repository and download URLs remain at `MohamedElashri/kwi-mac`.
+The project now lives at `MohamedElashri/zirq`. Existing GitHub repository and
+release links redirect to the new location. Update a local checkout with:
+
+```sh
+git remote set-url origin https://github.com/MohamedElashri/zirq.git
+```
+
+For an existing Homebrew installation, add the new tap before upgrading. The
+new tap includes the old cask token in its rename map:
+
+```sh
+brew tap MohamedElashri/zirq https://github.com/MohamedElashri/zirq.git
+brew update
+brew upgrade --cask mohamedelashri/zirq/zirq
+```
+
+After the upgrade succeeds, the old tap can be removed with
+`brew untap MohamedElashri/kwi-mac`.
+
+Re-add Zirq to the Dock and update any custom launchers or shell aliases that
+refer to `Kwi.app` or its `kwi` executable.
 
 ## Use
 

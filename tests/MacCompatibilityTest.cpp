@@ -14,6 +14,7 @@
 #include "settings/TerminalPresets.h"
 #include "settings/TerminalSettings.h"
 #include "ui/AppShortcuts.h"
+#include "ui/AppAboutData.h"
 #include "ui/WebShortcutModel.h"
 #include <BreezeIcons>
 #include <ActionCollection/ActionCollection>
@@ -593,6 +594,23 @@ private Q_SLOTS:
         }
     }
 
+    void publicIdentityUsesZirq()
+    {
+        const auto about = Kwi::applicationAboutData();
+        QCOMPARE(about.displayName(), QStringLiteral("Zirq"));
+        QCOMPARE(about.componentName(), QStringLiteral("zirq"));
+        QCOMPARE(about.desktopFileName(), QStringLiteral("com.elashri.zirq"));
+        QCOMPARE(about.homepage(), QStringLiteral("https://github.com/MohamedElashri/zirq"));
+        QCOMPARE(about.bugAddress(), QStringLiteral("https://github.com/MohamedElashri/zirq/issues"));
+        QVERIFY(!about.programLogo().value<QIcon>().isNull());
+        Kwi::Session session;
+        QVERIFY(session.terminal());
+        QSignalSpy replies{session.terminal(), SIGNAL(writeRequested(QByteArray))};
+        session.feed("\033[>q");
+        QCOMPARE(replies.size(), 1);
+        QVERIFY(replies.constFirst().constFirst().toByteArray().contains("Zirq (libghostty "));
+    }
+
     void readOnlyRepliesAndMonitoring()
     {
         Kwi::Session session;
@@ -638,7 +656,7 @@ int main(int argc, char **argv)
     BreezeIcons::initIcons();
     QQuickWindow::setDefaultAlphaBuffer(true);
     QApplication app{argc, argv};
-    QCoreApplication::setApplicationName(profile ? QStringLiteral("zirq") : QStringLiteral("kwi-macos-compatibility-test"));
+    QCoreApplication::setApplicationName(profile ? QStringLiteral("zirq") : QStringLiteral("zirq-macos-compatibility-test"));
     if (profile) {
         QCoreApplication::setOrganizationDomain(QStringLiteral("elashri.com"));
         KConfig::setMainConfigName(QStringLiteral("kwirc"));

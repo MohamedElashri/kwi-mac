@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Kwi contributors
 # SPDX-License-Identifier: CC0-1.0
 import json
+import plistlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -15,6 +16,15 @@ class PackageTest(unittest.TestCase):
         with mock.patch.dict("sys.modules", {"bundle": bundle}):
             package = load("package")
         return bundle, package
+
+    def test_old_branding_under_a_new_bundle_name_is_rejected(self):
+        bundle, _ = self.modules()
+        with tempfile.TemporaryDirectory() as directory:
+            app = Path(directory) / "Zirq.app"
+            (app / "Contents").mkdir(parents=True)
+            (app / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleName": "Kwi Mac"}))
+            with self.assertRaisesRegex(RuntimeError, "Bundle identity"):
+                bundle.inventory_resources(app)
 
     def test_deployed_dependency_cannot_fall_back_to_prefix(self):
         bundle, _ = self.modules()

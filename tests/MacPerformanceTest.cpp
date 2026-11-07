@@ -153,7 +153,7 @@ QtMessageHandler previousHandler{};
 
 void messageHandler(QtMsgType type, const QMessageLogContext &context, const QString &message)
 {
-    if (message.startsWith(QLatin1String("KWI_TRACE "))) {
+    if (message.startsWith(QLatin1String("ZIRQ_TRACE "))) {
         const auto event = QJsonDocument::fromJson(message.mid(10).toUtf8()).object();
         QMutexLocker lock{&monitor.mutex};
         if (event.value(QStringLiteral("kind")) == QLatin1String("render"))
@@ -1192,10 +1192,10 @@ int main(int argc, char **argv)
     BreezeIcons::initIcons();
     QQuickWindow::setDefaultAlphaBuffer(true); // Match the standalone application.
     QApplication app{argc, argv};
-    QCoreApplication::setApplicationName(QStringLiteral("kwi-macos-performance"));
+    QCoreApplication::setApplicationName(QStringLiteral("zirq-macos-performance"));
     app.setQuitOnLastWindowClosed(false);
-    app.setProperty("kwiTrace", qEnvironmentVariableIntValue("KWI_PERF_TRACE") != 0);
-    app.setProperty("kwiTraceLevel", 2);
+    app.setProperty("zirqTrace", qEnvironmentVariableIntValue("KWI_PERF_TRACE") != 0);
+    app.setProperty("zirqTraceLevel", 2);
     MacPerformanceTest test;
     return QTest::qExec(&test, argc, argv);
 }

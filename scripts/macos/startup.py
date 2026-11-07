@@ -23,7 +23,7 @@ def measure(app, directory, home, child_helper, presentation_library=None):
     ensure_kwi_not_running(lock)
     env = {k: os.environ[k] for k in ("USER", "LOGNAME") if k in os.environ}
     env.update(HOME=str(home), CFFIXED_USER_HOME=str(home), PATH="/usr/bin:/bin:/usr/sbin:/sbin", LANG="en_US.UTF-8",
-               KWI_TRACE="2", KWI_TRACE_MARKER="KWI_STARTUP_SETTLED")
+               ZIRQ_TRACE="2", ZIRQ_TRACE_MARKER="KWI_STARTUP_SETTLED")
     if presentation_library:
         env.update(DYLD_INSERT_LIBRARIES=str(presentation_library), KWI_PRESENTATION_TRACE=str(directory / "drawables.jsonl"))
     marker = directory / "ready.json"

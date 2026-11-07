@@ -71,7 +71,7 @@ not_running() {
 }
 
 main() {
-    local app_dir="" repository=https://github.com/MohamedElashri/kwi-mac
+    local app_dir="" repository=https://github.com/MohamedElashri/zirq
     local release_url tag version installed system_version minimum checksum actual staged product archive identity
     while [[ $# -gt 0 ]]; do
         case "$1" in

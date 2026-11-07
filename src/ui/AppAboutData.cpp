@@ -18,19 +18,19 @@ KAboutData applicationAboutData()
                      QStringLiteral(KWI_VERSION_STRING),
                      i18n("A fast terminal for macOS with Arabic, Persian and Hebrew support"),
                      KAboutLicense::GPL_V2,
-                     i18n("© 2026 Kwi contributors\n© 2026 Mohamed Elashri")};
+                     i18n("© 2026 Mohamed Elashri\n© 2026 KDE Kwi contributors")};
     about.setOtherText(
-        i18n("An independently maintained macOS fork of KDE Kwi.\n"
+        i18n("A terminal workspace for macOS, built on KDE Kwi.\n"
              "Releases and support are provided by the Zirq project."));
-    about.setHomepage(QStringLiteral("https://github.com/MohamedElashri/kwi-mac"));
-    about.setBugAddress(QByteArrayLiteral("https://github.com/MohamedElashri/kwi-mac/issues"));
+    about.setHomepage(QStringLiteral("https://github.com/MohamedElashri/zirq"));
+    about.setBugAddress(QByteArrayLiteral("https://github.com/MohamedElashri/zirq/issues"));
     about.setOrganizationDomain(QByteArrayLiteral(KWI_ORGANIZATION_DOMAIN));
     about.setDesktopFileName(QStringLiteral(KWI_APP_ID));
     about.setProgramLogo(QVariant::fromValue(QIcon{QStringLiteral(":/icons/" KWI_APP_ID ".svg")}));
     about.addAuthor(QStringLiteral("Mohamed Elashri"),
                     i18n("Maintainer; macOS integration and bidirectional text support"),
-                    QStringLiteral("kwi@elashri.com"),
-                    QStringLiteral("https://github.com/MohamedElashri/kwi-mac"));
+                    QString{},
+                    QStringLiteral("https://github.com/MohamedElashri/zirq"));
     about.addCredit(QStringLiteral("Eike Hein"),
                     i18n("Creator of KDE Kwi"),
                     QStringLiteral("hein@kde.org"),

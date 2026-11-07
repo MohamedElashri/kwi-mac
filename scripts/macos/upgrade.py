@@ -16,7 +16,7 @@ from app_test_support import ensure_kwi_not_running, executable, process_path, w
 from package import verify_assets
 
 ROOT = Path(__file__).resolve().parents[2]
-REPOSITORY = "https://github.com/MohamedElashri/kwi-mac"
+REPOSITORY = "https://github.com/MohamedElashri/zirq"
 
 
 def run(command, **kwargs):

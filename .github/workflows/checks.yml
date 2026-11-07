@@ -132,7 +132,7 @@ jobs:
 
   cask:
     if: >-
-      github.repository == 'MohamedElashri/kwi-mac' &&
+      github.repository == 'MohamedElashri/zirq' &&
       ((github.event_name == 'release' && !github.event.release.draft && !github.event.release.prerelease) ||
        (github.event_name == 'workflow_dispatch' && inputs.sync_cask))
     runs-on: ubuntu-latest

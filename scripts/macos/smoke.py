@@ -26,8 +26,10 @@ def trace_clock_ns():
 def records(log):
     result = []
     for line in log.splitlines():
-        if "KWI_TRACE {" in line:
-            result.append(json.loads(line.split("KWI_TRACE ", 1)[1]))
+        for prefix in ("ZIRQ_TRACE ", "KWI_TRACE "):
+            if prefix + "{" in line:
+                result.append(json.loads(line.split(prefix, 1)[1]))
+                break
     return result
 
 
@@ -65,7 +67,7 @@ def main():
     if marker.exists():
         marker.unlink()
     env = {key: os.environ[key] for key in ("HOME", "USER", "LOGNAME") if key in os.environ}
-    env.update(PATH="/usr/bin:/bin:/usr/sbin:/sbin", LANG="en_US.UTF-8", KWI_TRACE="1", KWI_TRACE_MARKER="KWI_BUNDLE_SMOKE_READY", QSG_INFO="1")
+    env.update(PATH="/usr/bin:/bin:/usr/sbin:/sbin", LANG="en_US.UTF-8", ZIRQ_TRACE="1", ZIRQ_TRACE_MARKER="KWI_BUNDLE_SMOKE_READY", QSG_INFO="1")
     profile_home = work / "profile-home"
     if args.isolated_profile:
         profile_home.mkdir(exist_ok=True)
@@ -87,7 +89,7 @@ def main():
             hidden = candidate
         with log_path.open("w") as log:
             # $1 is a separate argv entry, including spaces/Unicode, never shell interpolation.
-            command = "printf 'KWI_BUNDLE_SMOKE_READY\\n'; printf '%s|%s|%s|%s|%s\\n' \"$TERM\" \"$COLORTERM\" \"$TERM_PROGRAM\" \"${KWI_TRACE-unset}\" \"$PWD\" > \"$1\""
+            command = "printf 'KWI_BUNDLE_SMOKE_READY\\n'; printf '%s|%s|%s|%s|%s\\n' \"$TERM\" \"$COLORTERM\" \"$TERM_PROGRAM\" \"${ZIRQ_TRACE-unset}\" \"$PWD\" > \"$1\""
             process = subprocess.Popen([str(executable), "--hold", "-e", "/bin/sh", "-c", command, "kwi-smoke", str(marker)],
                                        cwd="/", env=env, stdout=log, stderr=subprocess.STDOUT)
             deadline = time.monotonic() + 15

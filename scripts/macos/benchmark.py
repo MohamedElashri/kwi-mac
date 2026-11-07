@@ -38,7 +38,7 @@ def measure(args, directory, home):
         if args.presentation_library:
             env.update(DYLD_INSERT_LIBRARIES=str(args.presentation_library), KWI_PRESENTATION_TRACE=str(directory / "drawables.jsonl"))
         if args.trace:
-            env.update(KWI_TRACE=str(args.trace), KWI_TRACE_MARKER="KWI_BENCHMARK_DONE")
+            env.update(ZIRQ_TRACE=str(args.trace), ZIRQ_TRACE_MARKER="KWI_BENCHMARK_DONE")
         command = [str(app_executable), "--hold", "-e", *child]
     else:
         # Launch Services is the supported Ghostty.app entry point. Explicit env

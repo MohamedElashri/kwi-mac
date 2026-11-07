@@ -18,7 +18,8 @@ import uuid
 
 import bundle
 
-OWNER = "kwi-macos-package-v1"
+OWNER = "zirq-macos-package-v1"
+LEGACY_OWNER = "kwi-macos-package-v1"
 ROOT = Path(__file__).resolve().parents[2]
 ASSET_FILES = ("Zirq-arm64.zip", "Zirq-sources.tar.gz", "SOURCES.json", "package.json", "Zirq.bundle.json", "README.txt", "dependencies.json")
 
@@ -51,7 +52,7 @@ def check_output(path):
         if not marker.is_file() or marker.is_symlink():
             raise RuntimeError("Existing package output is not owned by this tool")
         record = json.loads(marker.read_text())
-        if record.get("owner") != OWNER or record.get("published_files") != snapshot(path, ("package.json",)):
+        if record.get("owner") not in (OWNER, LEGACY_OWNER) or record.get("published_files") != snapshot(path, ("package.json",)):
             raise RuntimeError("Existing output is unowned or changed; preserve it and choose a fresh output")
 
 
@@ -122,7 +123,7 @@ def assemble_assets(package_dir, dependencies, destination):
         raise RuntimeError("Release assets and package directories must be separate")
     check_assets_output(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=".kwi-assets-", dir=destination.parent) as temporary:
+    with tempfile.TemporaryDirectory(prefix=".zirq-assets-", dir=destination.parent) as temporary:
         staged = Path(temporary) / "assets"
         staged.mkdir()
         for name in ASSET_FILES:
@@ -135,7 +136,7 @@ def assemble_assets(package_dir, dependencies, destination):
 def validate_tag(tag):
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-mac\.[0-9]+)?", tag):
         raise RuntimeError("Set TAG to an existing version tag")
-    version = re.search(r"project\(kwi VERSION ([\d.]+)", (ROOT / "CMakeLists.txt").read_text())[1]
+    version = re.search(r"project\(zirq VERSION ([\d.]+)", (ROOT / "CMakeLists.txt").read_text())[1]
     if tag.removeprefix("v").split("-mac.")[0] != version:
         raise RuntimeError("Tag must match the CMake project version")
     commit = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", f"refs/tags/{tag}^{{commit}}"], text=True).strip()
@@ -162,7 +163,7 @@ def draft_release(tag, directory):
              "Dependency notices are bundled in the app. Zirq-sources.tar.gz contains matching application, dependency and build recipe sources.\n"
              "SOURCES.json lists versions and hashes. Verify downloads with SHA256SUMS.\n"
              "Review this draft before publication.\n")
-    with tempfile.TemporaryDirectory(prefix="kwi-release-notes-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="zirq-release-notes-") as temporary:
         note_file = Path(temporary) / "notes.txt"
         note_file.write_text(notes)
         flags = ["--draft", "--prerelease=" + str("-" in tag).lower(), "--notes-file", str(note_file)]
@@ -178,7 +179,7 @@ def build(args):
     destination = args.output.absolute()
     check_output(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=".kwi-package-", dir=destination.parent) as temporary:
+    with tempfile.TemporaryDirectory(prefix=".zirq-package-", dir=destination.parent) as temporary:
         work = Path(temporary)
         staged = work / "package"
         staged.mkdir()
@@ -197,7 +198,7 @@ def build(args):
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
         archive = staged / "Zirq-arm64.zip"
         bundle.run(["/usr/bin/ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, archive])
-        extracted = work / "Extracted Kwi-é"
+        extracted = work / "Extracted Zirq-é"
         bundle.run(["/usr/bin/ditto", "-x", "-k", archive, extracted])
         restored = extracted / "Zirq.app"
         bundle.run(["codesign", "--verify", "--deep", "--strict", restored])
@@ -219,7 +220,7 @@ def build(args):
                   "archive": {"name": archive.name, "sha256": digest(archive), "bytes": archive.stat().st_size},
                   "executable_sha256": digest(app / "Contents/MacOS/zirq"), "resources": resources,
                   "bundle_manifest_sha256": digest(staged / "Zirq.bundle.json"),
-                  "source": json.loads((app / "Contents/Resources/kwi-bundle.json").read_text()),
+                  "source": json.loads((app / "Contents/Resources/zirq-bundle.json").read_text()),
                   "source_distribution": source_distribution, "notarized": False,
                   "published_files": snapshot(staged)}
         (staged / "package.json").write_text(json.dumps(record, indent=2) + "\n")

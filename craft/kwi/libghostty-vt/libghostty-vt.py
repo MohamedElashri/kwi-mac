@@ -16,7 +16,7 @@ from Utils import CraftHash
 
 class subinfo(info.infoclass):
     def setTargets(self):
-        self.description = "Pinned Ghostty VT C library for Kwi"
+        self.description = "Pinned Ghostty VT C library for Zirq"
         self.targets["1.0.0"] = "https://release.files.ghostty.org/libghostty-vt/1.0.0/libghostty-vt-1.0.0.tar.gz"
         self.archiveNames["1.0.0"] = "libghostty-vt-1.0.0.tar.gz"
         self.targetInstSrc["1.0.0"] = "libghostty-vt-1.0.0"

@@ -11,8 +11,8 @@ Use the root [Makefile](Makefile) for local work and CI.
 ## Build and run
 
 ```sh
-git clone https://github.com/MohamedElashri/kwi-mac.git
-cd kwi-mac
+git clone https://github.com/MohamedElashri/zirq.git
+cd zirq
 make run JOBS=2
 ```
 
@@ -76,8 +76,9 @@ option to retry, or `make sync-cask` from a clean, current checkout of `main`.
 Actions must be allowed to create pull requests in repository settings. GitHub
 combines that permission with review approvals; this workflow never approves PRs.
 
-Use your verified Git identity for personal commits. The app's public contact is
-`kwi@elashri.com`; automated cask commits use GitHub's verified bot identity.
+Use your verified Git identity for personal commits. Support and bug reports go
+through the [Zirq issue tracker](https://github.com/MohamedElashri/zirq/issues).
+Automated cask commits use GitHub's verified bot identity.
 
 ## Maintenance
 
@@ -108,10 +109,15 @@ Version 0.3.0 is the first source version with the Zirq identity. The tap keeps
 its verified 0.2.0 archive until a Zirq release is published; the cask updater
 then switches both the archive and bundle names together.
 
-Internal CMake targets, QML modules, translation domains and `KwiLaunchPreset`
+The top-level CMake project is `zirq`. Internal library targets, QML modules,
+translation domains and `KwiLaunchPreset`
 files retain their upstream names. The existing `kwirc`, `kwiterminalrc`, `kwistaterc`,
 shortcut collections and `kwi/` data directories remain the profile locations.
 This preserves user data and keeps upstream synchronization manageable.
+
+Diagnostics use `ZIRQ_TRACE` and `ZIRQ_TRACE_MARKER`; the old `KWI_TRACE`
+variables remain accepted for existing developer scripts. New bundles record
+provenance in `zirq-bundle.json`, including the icon and metadata input hashes.
 
 `logo.svg` is the vector source for the Zirq mark. Regenerate the 1024-pixel
 `logo.png` with `rsvg-convert -w 1024 -h 1024 -o logo.png logo.svg`; the Mac build

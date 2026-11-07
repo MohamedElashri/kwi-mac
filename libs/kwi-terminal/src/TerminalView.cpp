@@ -665,8 +665,8 @@ void TerminalView::updatePolish()
                    {QStringLiteral("generation"), qint64(m_frame.generation)},
                    {QStringLiteral("columns"), m_frame.columns},
                    {QStringLiteral("rows"), m_frame.rows.size()}});
-        const auto marker = QCoreApplication::instance()->property("kwiTraceMarker").toString();
-        if (!m_traceMarkerSeen && !marker.isEmpty() && m_session->property("kwiTraceMarkerFed").toBool()) {
+        const auto marker = QCoreApplication::instance()->property("zirqTraceMarker").toString();
+        if (!m_traceMarkerSeen && !marker.isEmpty() && m_session->property("zirqTraceMarkerFed").toBool()) {
             QString text;
             for (const auto &row : std::as_const(m_frame.rows)) {
                 for (const auto &cell : row) {

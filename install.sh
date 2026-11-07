@@ -51,7 +51,8 @@ version_at_least() {
 
 check_app() {
     [[ -d "$1" && ! -L "$1" ]] || fail "Refusing to replace an invalid or symlinked app: $1"
-    local identity="$(plist "$1" CFBundleIdentifier)/$(plist "$1" CFBundleExecutable)"
+    local identity
+    identity="$(plist "$1" CFBundleIdentifier)/$(plist "$1" CFBundleExecutable)"
     [[ "$identity" = com.elashri.zirq/zirq || "$identity" = org.kde.kwi/kwi ]] \
         || fail "The app at $1 is not Zirq or its Kwi predecessor."
 }

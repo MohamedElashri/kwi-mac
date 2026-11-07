@@ -29,7 +29,7 @@ def runtime_components(database, binaries):
     required = {}
     for binary in binaries:
         name = Path(binary).name
-        if name == "kwi" or name.startswith("libkwi-terminal"):
+        if name == "zirq" or name.startswith("libkwi-terminal"):
             continue
         if name not in by_name:
             raise RuntimeError(f"No source package owns bundled binary {name}")

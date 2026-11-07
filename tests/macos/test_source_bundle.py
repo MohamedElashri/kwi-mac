@@ -39,7 +39,7 @@ class SourceBundleTest(unittest.TestCase):
                 db.executescript("CREATE TABLE packageList(packageId,packagePath,version); CREATE TABLE fileList(packageId,filename);")
                 db.execute("INSERT INTO packageList VALUES(1,'libs/example','1.2')")
                 db.execute("INSERT INTO fileList VALUES(1,'lib/libExample.dylib')")
-            self.assertEqual(self.sources.runtime_components(database, [Path("Zirq.app/kwi"), Path("Zirq.app/libExample.dylib")]), {"libs/example": "1.2"})
+            self.assertEqual(self.sources.runtime_components(database, [Path("Zirq.app/Contents/MacOS/zirq"), Path("Zirq.app/libExample.dylib")]), {"libs/example": "1.2"})
             with self.assertRaisesRegex(RuntimeError, "No source package owns"):
                 self.sources.runtime_components(database, [Path("libUnknown.dylib")])
 

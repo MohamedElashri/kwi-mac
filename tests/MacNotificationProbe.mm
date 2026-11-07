@@ -37,8 +37,8 @@ int main(int argc, char **argv)
     pidFile.write(QByteArray::number(getpid()));
     pidFile.close();
     QApplication app{argc, argv};
-    QCoreApplication::setApplicationName(QStringLiteral("kwi"));
-    const QString marker{QStringLiteral("Kwi notification check %1").arg(getpid())};
+    QCoreApplication::setApplicationName(QStringLiteral("zirq"));
+    const QString marker{QStringLiteral("Zirq notification check %1").arg(getpid())};
     QPointer<KNotification> notification = new KNotification{QStringLiteral("notification"), KNotification::CloseOnTimeout, &app};
     notification->setComponentName(QStringLiteral("kwi"));
     notification->setTitle(marker);
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
                                            {QStringLiteral("permission_api_status"), int(KNotificationPermission::checkPermission())},
                                            {QStringLiteral("scope"),
                                             QStringLiteral("Pinned KNotifications AppKit backend to this probe app's delivered-notification list; visual "
-                                                           "banner/click and real Kwi permission policy remain separate.")}}}
+                                                           "banner/click and real Zirq permission policy remain separate.")}}}
                      .toJson());
     return accepted ? 0 : 3;
 }

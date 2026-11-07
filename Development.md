@@ -115,6 +115,27 @@ files retain their upstream names. The existing `kwirc`, `kwiterminalrc`, `kwist
 shortcut collections and `kwi/` data directories remain the profile locations.
 This preserves user data and keeps upstream synchronization manageable.
 
+The name audit covers tracked filenames as well as file contents. Remaining
+references have specific purposes:
+
+| Location | Why the old name remains |
+| --- | --- |
+| Preferences, presets, shortcut IDs, drag MIME type, and `KwiLaunchPreset` | Existing data and integrations must keep working |
+| `Kwi` C++ namespace, `org.kde.kwi` QML modules, library targets, and translation catalogs | Upstream source/API identities; these do not set the app's displayed name |
+| `craft/kwi/`, dependency receipts, resource paths, and test fixture markers | Build and test plumbing, including verification against the predecessor |
+| Old archive names, installer detection, locks, cask rename, and owned-output markers | Safe upgrades and recovery from earlier installations/builds |
+| KDE Kwi acknowledgments, copyright and license records | Upstream attribution |
+
+New user-facing product names, app metadata, icons, support URLs, terminal
+identification, and release artifacts use Zirq. Do not mechanically rename the
+compatibility identifiers in the table. When changing one, provide a migration
+or fallback and test the real previous-release upgrade.
+
+Renaming the GitHub repository does not rename an existing local checkout.
+Update its remote with `git remote set-url origin https://github.com/MohamedElashri/zirq.git`.
+The directory name can still appear as a terminal tab title. A built Craft prefix
+contains absolute paths, so use a fresh prefix after moving the checkout.
+
 Diagnostics use `ZIRQ_TRACE` and `ZIRQ_TRACE_MARKER`; the old `KWI_TRACE`
 variables remain accepted for existing developer scripts. New bundles record
 provenance in `zirq-bundle.json`, including the icon and metadata input hashes.

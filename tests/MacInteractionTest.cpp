@@ -30,6 +30,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPalette>
 #include <QProcess>
 #include <QQmlComponent>
 #include <QQmlContext>
@@ -375,19 +376,35 @@ private Q_SLOTS:
     void readmeScreenshot()
     {
         const auto originalScheme = QGuiApplication::styleHints()->colorScheme();
+        const auto originalPalette = QGuiApplication::palette();
         const auto restoreAppearance = qScopeGuard([&] {
             QGuiApplication::styleHints()->setColorScheme(originalScheme);
+            QApplication::setPalette(originalPalette);
         });
         QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Dark);
+        // The desktop Kirigami style uses SystemPalette. A color-scheme hint
+        // alone does not override a light host palette in an isolated capture.
+        QPalette dark{originalPalette};
+        for (auto role : {QPalette::WindowText, QPalette::Text, QPalette::ButtonText, QPalette::ToolTipText})
+            dark.setColor(role, QColor{QStringLiteral("#e6eeec")});
+        dark.setColor(QPalette::Window, QColor{QStringLiteral("#202626")});
+        dark.setColor(QPalette::Base, QColor{QStringLiteral("#171717")});
+        dark.setColor(QPalette::AlternateBase, QColor{QStringLiteral("#242b2b")});
+        dark.setColor(QPalette::Button, QColor{QStringLiteral("#252d2d")});
+        dark.setColor(QPalette::ToolTipBase, QColor{QStringLiteral("#252d2d")});
+        dark.setColor(QPalette::Highlight, QColor{QStringLiteral("#72e6c4")});
+        dark.setColor(QPalette::HighlightedText, QColor{QStringLiteral("#10201b")});
+        dark.setColor(QPalette::Disabled, QPalette::Text, QColor{QStringLiteral("#82918c")});
+        QApplication::setPalette(dark);
         m_settings->setFontPointSize(14);
         m_settings->setColorScheme(QStringLiteral("Breeze"));
         m_settings->setBackgroundOpacity(1);
         m_settings->setBackgroundBlur(false);
         m_settings->setTabBarAtBottom(false);
-        m_window->resize(940, 470);
-        m_session->setCustomTitle(QStringLiteral("Overview"));
+        m_window->resize(900, 420);
+        m_session->setCustomTitle(QStringLiteral("Zirq"));
         auto *model = m_windows->sessions(m_window);
-        for (const auto &title : {QStringLiteral("Build"), QStringLiteral("Notes")}) {
+        for (const auto &title : {QStringLiteral("Workspace"), QStringLiteral("Notes")}) {
             Kwi::LaunchRequest request;
             request.command = QStringList{QStringLiteral("/bin/sleep"), QStringLiteral("60")};
             request.contextDirectory = m_directory.path();
@@ -399,22 +416,24 @@ private Q_SLOTS:
         // No shell profile, desktop pixels or real user/host/path data is included.
         m_session->feed(
             "\033[2J\033[H\r\n"
-            "  \033[1;38;2;124;191;255mZirq for macOS\033[0m\r\n"
-            "  A terminal workspace for Apple Silicon.\r\n\r\n"
-            "  \033[38;2;132;210;158m>\033[0m make help\r\n\r\n"
-            "    \033[38;2;124;191;255mbuild\033[0m       Compile the application\r\n"
-            "    \033[38;2;124;191;255mtest\033[0m        Run tooling and native tests\r\n"
-            "    \033[38;2;124;191;255mrun\033[0m         Open Zirq\r\n"
-            "    \033[38;2;124;191;255mpackage\033[0m     Create a verified application bundle\r\n"
-            "    \033[38;2;124;191;255mci\033[0m          Build, test and package\r\n\r\n"
-            "  \033[38;2;132;210;158m>\033[0m ./colors\r\n\r\n"
+            "  \033[1;38;2;114;230;196mZirq\033[0m\r\n"
+            "  A terminal for every direction.\r\n\r\n"
+            "  \033[38;2;114;230;196m>\033[0m cat hello.txt\r\n\r\n");
+        m_session->feed(QStringLiteral(
+            "    Hello, world.\r\n"
+            "    مرحباً بالعالم\r\n"
+            "    سلام دنیا\r\n"
+            "    שלום עולם\r\n\r\n"
+            "    café  λ →  日本語\r\n\r\n").toUtf8());
+        m_session->feed(
+            "  \033[38;2;114;230;196m>\033[0m ./colors\r\n\r\n"
             "    \033[48;2;231;113;130m    \033[48;2;237;179;112m    \033[48;2;235;212;128m    "
             "\033[48;2;132;210;158m    \033[48;2;117;199;204m    \033[48;2;124;165;234m    "
             "\033[48;2;180;151;231m    \033[0m\r\n\r\n");
-        m_session->feed(QStringLiteral("  Unicode: café  λ →  日本語  ┌─┬─┐\r\n\r\n").toUtf8());
-        m_session->feed("  \033[38;2;132;210;158m>\033[0m ");
-        QTRY_VERIFY(m_session->historyText().contains(QLatin1String("A terminal workspace")));
+        m_session->feed("  \033[38;2;114;230;196m>\033[0m ");
+        QTRY_VERIFY(m_session->historyText().contains(QStringLiteral("مرحباً بالعالم")));
         QTest::qWait(400);
+        QVERIFY(m_window->grabWindow().pixelColor(4, 4).lightness() < 100);
         screenshot(QStringLiteral("readme"));
     }
 

@@ -6,6 +6,7 @@
 
 #include <KLocalizedString>
 #include <KUser>
+#include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
 #ifdef Q_OS_MACOS
@@ -69,9 +70,14 @@ QMap<QString, std::optional<QString>> TerminalLaunch::resolvedEnvironmentChanges
     QMap<QString, std::optional<QString>> result{{QStringLiteral("TERM"), QStringLiteral("xterm-256color")},
                                                  {QStringLiteral("COLORTERM"), QStringLiteral("truecolor")},
                                                  {QStringLiteral("TERM_PROGRAM"), QStringLiteral("zirq")},
+                                                 {QStringLiteral("TERM_PROGRAM_VERSION"), std::nullopt},
                                                  {QStringLiteral("COLUMNS"), std::nullopt},
                                                  {QStringLiteral("LINES"), std::nullopt},
                                                  {QStringLiteral("TERMCAP"), std::nullopt}};
+    const auto version = QCoreApplication::applicationVersion();
+    if (!version.isEmpty()) {
+        result.insert(QStringLiteral("TERM_PROGRAM_VERSION"), version);
+    }
     result.insert(environmentChanges);
 #ifdef Q_OS_MACOS
     // Finder/Launch Services need not supply a locale. Give native children a

@@ -6,6 +6,7 @@
 
 #include <QByteArray>
 #include <QChar>
+#include <QCoreApplication>
 #include <QDir>
 #include <QLatin1Char>
 #include <QMetaType>
@@ -114,10 +115,13 @@ void LaunchSettingsTest::environmentIsLiteralAndCaptured()
 // Terminal environment defaults preserve explicit overrides and removals.
 void LaunchSettingsTest::terminalDefaultsKeepTheRequestedRecipe()
 {
+    const auto previousVersion = QCoreApplication::applicationVersion();
+    const auto restoreVersion = qScopeGuard([&] { QCoreApplication::setApplicationVersion(previousVersion); });
+    QCoreApplication::setApplicationVersion(QStringLiteral("0.3.0"));
     TerminalLaunch launch{};
     launch.inheritedEnvironment.clear();
 
-    for (const auto *name : {"TERM", "COLORTERM", "TERM_PROGRAM", "COLUMNS", "LINES", "TERMCAP"}) {
+    for (const auto *name : {"TERM", "COLORTERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "COLUMNS", "LINES", "TERMCAP"}) {
         launch.inheritedEnvironment.insert(QString::fromLatin1(name), QStringLiteral("inherited"));
     }
 
@@ -126,6 +130,7 @@ void LaunchSettingsTest::terminalDefaultsKeepTheRequestedRecipe()
     QCOMPARE(defaults.value(QStringLiteral("TERM")), QStringLiteral("xterm-256color"));
     QCOMPARE(defaults.value(QStringLiteral("COLORTERM")), QStringLiteral("truecolor"));
     QCOMPARE(defaults.value(QStringLiteral("TERM_PROGRAM")), QStringLiteral("zirq"));
+    QCOMPARE(defaults.value(QStringLiteral("TERM_PROGRAM_VERSION")), QStringLiteral("0.3.0"));
 
     for (const auto *name : {"COLUMNS", "LINES", "TERMCAP"}) {
         QVERIFY(!defaults.contains(QString::fromLatin1(name)));
@@ -134,6 +139,7 @@ void LaunchSettingsTest::terminalDefaultsKeepTheRequestedRecipe()
     launch.environmentChanges = {{QStringLiteral("TERM"), QStringLiteral("vt100")},
                                  {QStringLiteral("COLORTERM"), std::nullopt},
                                  {QStringLiteral("COLUMNS"), QStringLiteral("42")},
+                                 {QStringLiteral("TERM_PROGRAM_VERSION"), QStringLiteral("custom-version")},
                                  {QStringLiteral("EXPLICIT"), QStringLiteral("literal=$HOME")}};
     const auto changes = launch.resolvedEnvironmentChanges();
     QCOMPARE(changes.value(QStringLiteral("TERM")).value_or(QString{}), QStringLiteral("vt100"));
@@ -146,8 +152,12 @@ void LaunchSettingsTest::terminalDefaultsKeepTheRequestedRecipe()
     QVERIFY(!environment.contains(QStringLiteral("LINES")));
     QVERIFY(!environment.contains(QStringLiteral("TERMCAP")));
     QCOMPARE(environment.value(QStringLiteral("TERM_PROGRAM")), QStringLiteral("zirq"));
+    QCOMPARE(environment.value(QStringLiteral("TERM_PROGRAM_VERSION")), QStringLiteral("custom-version"));
     QCOMPARE(environment.value(QStringLiteral("EXPLICIT")), QStringLiteral("literal=$HOME"));
     QCOMPARE(environment.value(QStringLiteral("UNCHANGED")), QStringLiteral("captured"));
+    QCoreApplication::setApplicationVersion({});
+    launch.environmentChanges.remove(QStringLiteral("TERM_PROGRAM_VERSION"));
+    QVERIFY(!launch.environment().contains(QStringLiteral("TERM_PROGRAM_VERSION")));
 }
 
 void LaunchSettingsTest::validatesRecipes_data()

@@ -11,6 +11,7 @@
 #include "TerminalSession.h"
 #include "TerminalView.h"
 #include "WindowManager.h"
+#include "kwi-version.h"
 #include "settings/TerminalPaletteModel.h"
 #include "settings/TerminalPresets.h"
 #include "settings/TerminalSettings.h"
@@ -1193,6 +1194,7 @@ int main(int argc, char **argv)
     QQuickWindow::setDefaultAlphaBuffer(true); // Match the standalone application.
     QApplication app{argc, argv};
     QCoreApplication::setApplicationName(QStringLiteral("zirq-macos-performance"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(KWI_VERSION_STRING));
     app.setQuitOnLastWindowClosed(false);
     app.setProperty("zirqTrace", qEnvironmentVariableIntValue("KWI_PERF_TRACE") != 0);
     app.setProperty("zirqTraceLevel", 2);

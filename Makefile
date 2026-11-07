@@ -148,7 +148,7 @@ benchmark: ## Benchmark an existing APP; supply workload/options in ARGS
 	"$(PYTHON)" scripts/macos/benchmark.py --app "$(APP)" --terminal zirq --output "$(RESULTS_DIR)/benchmark" $(ARGS)
 
 memory: ## Run the isolated app memory campaign
-	"$(PYTHON)" scripts/macos/memory.py --app "$(APP)" --output "$(RESULTS_DIR)/memory" --metrics-tool "$(TEST_BUILD)/bin/test-native-process.app/Contents/MacOS/test-native-process" $(ARGS)
+	"$(PYTHON)" scripts/macos/memory.py --app "$(APP)" --output "$(RESULTS_DIR)/memory" --metrics-tool "$(TEST_BUILD)/bin/test-macos-performance.app/Contents/MacOS/test-macos-performance" $(ARGS)
 
 compatibility: ## Check CLI, presets and activation of an existing APP
 	"$(PYTHON)" scripts/macos/compatibility.py --app "$(APP)" --output "$(RESULTS_DIR)/compatibility" $(ARGS)

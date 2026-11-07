@@ -73,7 +73,7 @@ def seed_profile(output, home, probe):
         "import json,os,sys\nfrom pathlib import Path\n"
         "target=Path(sys.argv[1]); temporary=target.with_suffix('.partial')\n"
         "temporary.write_text(json.dumps({'parent':os.getppid(),'cwd':os.getcwd(),"
-        "'preset':os.getenv('ZIRQ_MIGRATION'),'terminal':os.getenv('TERM_PROGRAM')}))\n"
+        "'preset':os.getenv('ZIRQ_MIGRATION'),'terminal':os.getenv('TERM_PROGRAM'),'version':os.getenv('TERM_PROGRAM_VERSION')}))\n"
         "os.replace(temporary,target)\n")
     # Presets are stored by Qt's canonical file-URL ID, rather than their
     # display name. Use the native settings API to seed a genuine saved default.
@@ -136,7 +136,7 @@ def main():
     if old.exists() or not new.is_dir() or profile_files(home) != before:
         raise RuntimeError("Upgrade failed to replace Kwi or modified the legacy profile")
     after_launch = launch(new, output, home, "zirq-after")
-    if after_launch["terminal"] != "zirq":
+    if after_launch["terminal"] != "zirq" or after_launch["version"] != args.tag.removeprefix("v"):
         raise RuntimeError("The upgraded bundle did not identify as Zirq")
     probe_env = {**env, "HOME": str(home), "CFFIXED_USER_HOME": str(home)}
     run([args.probe.resolve(), "--profile-state", output / "profile.json"], env=probe_env, capture_output=True, text=True)

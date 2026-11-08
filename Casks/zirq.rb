@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: CC0-1.0
 
 cask "zirq" do
-  version "0.2.0"
-  sha256 "825b700cb4447d726b13a3a37f7bf7bb5b0d14baf284d89b9161ef5c330cd958"
+  version "0.3.0"
+  sha256 "93c78fea71ca0e767969a93f31163288101ea3b72ddcf07f530f84d9160ea2fc"
 
-  url "https://github.com/MohamedElashri/zirq/releases/download/v#{version}/Kwi-arm64.zip"
+  url "https://github.com/MohamedElashri/zirq/releases/download/v#{version}/Zirq-arm64.zip"
   name "Zirq"
   desc "Terminal with bidirectional Arabic, Persian and Hebrew support"
   homepage "https://github.com/MohamedElashri/zirq"
@@ -18,7 +18,7 @@ cask "zirq" do
   depends_on arch: :arm64
   depends_on macos: :sonoma
 
-  app "Kwi.app", target: "Zirq.app"
+  app "Zirq.app"
 
   caveats <<~EOS
     Requires macOS 14.4 or later. Quit Zirq or Kwi before upgrading.

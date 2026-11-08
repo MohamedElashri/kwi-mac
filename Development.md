@@ -66,13 +66,26 @@ make release TAG=vX.Y.Z
 Replace `vX.Y.Z` with that tag. Draft releases require authenticated GitHub CLI
 (`gh`) and a tag pushed to GitHub. Assets include checksums, licenses and matching sources.
 
-CI runs `make check` for docs and distribution changes. Application/build changes,
-version tags and manual runs use `make ci`.
+For GitHub Actions releases, open **Actions → Release Zirq → Run workflow**, select
+`main`, and enter an existing version tag, such as `v0.3.0`. Or use:
+
+```sh
+gh workflow run release.yml --ref main -f tag=vX.Y.Z
+```
+
+Pushing a new version tag also starts **Release Zirq** automatically. It calls
+the shared CI pipeline to validate the tag, build and test the exact commit,
+verify its Zirq app/source archives, and create or refresh an unpublished draft.
+Review the draft notes before publishing. Published releases cannot be replaced.
+
+The **CI** workflow handles pull requests and pushes to `main`. It runs `make check`
+for docs and distribution changes; application/build changes and manual runs use
+`make ci`. **Release Zirq** always runs the full pipeline.
 
 Publishing a stable release automatically opens a GitHub-signed bot PR updating
 `Casks/zirq.rb` and runs its tooling checks. Review and merge that PR to update
-Homebrew. This repository doubles as the tap. Use the CI workflow's **Sync Homebrew**
-option to retry, or `make sync-cask` from a clean, current checkout of `main`.
+Homebrew. This repository doubles as the tap. Use **Actions → Sync Homebrew**
+to retry, or `make sync-cask` from a clean, current checkout of `main`.
 Actions must be allowed to create pull requests in repository settings. GitHub
 combines that permission with review approvals; this workflow never approves PRs.
 

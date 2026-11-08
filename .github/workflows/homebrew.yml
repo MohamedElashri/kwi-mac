@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Mohamed Elashri
+# SPDX-License-Identifier: CC0-1.0
+name: Sync Homebrew
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published stable tag (empty uses the latest release)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  cask:
+    if: >-
+      github.repository == 'MohamedElashri/zirq' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (!github.event.release.draft && !github.event.release.prerelease))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: homebrew-cask-sync
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Update cask and open signed pull request
+        run: make sync-cask

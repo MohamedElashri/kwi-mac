@@ -5,20 +5,23 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ['v[0-9]*']
   pull_request:
-  release:
-    types: [published]
-  workflow_dispatch:
+  workflow_call:
     inputs:
       tag:
-        description: Existing version tag for a draft release (empty builds main)
+        description: Existing version tag to validate and build
         type: string
         required: false
-      sync_cask:
-        description: Sync Homebrew with the published release (skip app build)
-        type: boolean
-        default: false
+        default: ''
+    outputs:
+      commit:
+        description: Verified source commit
+        value: ${{ jobs.checks.outputs.commit }}
+      tag:
+        description: Validated release tag
+        value: ${{ jobs.checks.outputs.tag }}
+  workflow_dispatch:
+    inputs:
       cask_check:
         description: Check a cask automation commit against its parent
         type: boolean
@@ -29,7 +32,6 @@ permissions:
 
 jobs:
   checks:
-    if: github.event_name != 'release' && !inputs.sync_cask
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -101,58 +103,3 @@ jobs:
             build-macos/package.log
           if-no-files-found: ignore
           retention-days: 14
-
-  draft:
-    needs: [checks, build]
-    if: needs.checks.outputs.tag != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    concurrency:
-      group: release-${{ needs.checks.outputs.tag }}
-      cancel-in-progress: false
-    permissions:
-      contents: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: ${{ needs.checks.outputs.tag }}
-      EXPECTED_COMMIT: ${{ needs.checks.outputs.commit }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.checks.outputs.commit }}
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: zirq-macos-arm64-${{ needs.checks.outputs.commit }}
-          path: build-macos/release-assets
-      - name: Verify assets and prepare draft
-        run: make release
-
-  cask:
-    if: >-
-      github.repository == 'MohamedElashri/zirq' &&
-      ((github.event_name == 'release' && !github.event.release.draft && !github.event.release.prerelease) ||
-       (github.event_name == 'workflow_dispatch' && inputs.sync_cask))
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    concurrency:
-      group: homebrew-cask-sync
-      cancel-in-progress: false
-    permissions:
-      contents: write
-      pull-requests: write
-      actions: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      TAG: ${{ github.event.release.tag_name || inputs.tag }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: main
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Update cask and open signed pull request
-        run: make sync-cask

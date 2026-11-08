@@ -115,7 +115,7 @@ void CliTest::cleanup()
         if (!m_primary.waitForFinished(5000)) {
             m_primary.kill();
             QVERIFY(m_primary.waitForFinished(5000));
-            QFAIL("Kwi did not terminate.");
+            QFAIL("Zirq did not terminate.");
         }
     }
 }

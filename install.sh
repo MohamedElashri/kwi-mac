@@ -101,7 +101,7 @@ main() {
     ZIRQ_INSTALL_LOCK="$app_dir/.zirq-install.lock"
     trap cleanup EXIT
     # Coordinate with installers downloaded before the rename as well.
-    mkdir "$app_dir/.kwi-install.lock" 2>/dev/null || fail 'Another Kwi install may be running.'
+    mkdir "$app_dir/.kwi-install.lock" 2>/dev/null || fail 'Another Zirq or legacy installation may be running.'
     ZIRQ_INSTALL_LEGACY_LOCK="$app_dir/.kwi-install.lock"
     trap 'exit 129' HUP
     trap 'exit 130' INT

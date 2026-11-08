@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Kwi contributors
 // SPDX-License-Identifier: CC0-1.0
 
-// Opt-in test instrumentation only. Never linked into or deployed with Kwi.
+// Opt-in test instrumentation only. Never linked into or deployed with Zirq.
 #import <Metal/Metal.h>
 #import <QuartzCore/CAAnimation.h>
 #import <QuartzCore/CAMetalLayer.h>

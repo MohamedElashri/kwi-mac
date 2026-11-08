@@ -8,11 +8,12 @@ Zirq requires an Apple Silicon Mac running macOS 14.4 or later.
 
 ## Release availability
 
-Version 0.3.0 is the first Zirq-branded release. Until it is published, the stable
-installer and Homebrew cask still download the published 0.2.0 Kwi bundle. That
-older binary can still identify itself as Kwi even when installed as `Zirq.app`.
-New Zirq releases use `Zirq-arm64.zip`, executable `zirq`, and bundle identity
-`com.elashri.zirq`.
+Version 0.3.0 is the first Zirq-branded release. The installer and Homebrew cask
+now deliver `Zirq.app` from `Zirq-arm64.zip`, with executable `zirq` and bundle
+identity `com.elashri.zirq`.
+
+Older 0.2.0 binaries retain Kwi branding, even when installed as `Zirq.app`.
+Upgrade to 0.3.0 or later to get the new application identity and icon.
 
 ## Installer
 

@@ -1,5 +1,6 @@
 /build*/
 /plan.md
+!/AGENTS.md
 /.DS_Store
 /.clang-format
 *.user
